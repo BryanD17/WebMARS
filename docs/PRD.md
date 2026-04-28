@@ -2,15 +2,16 @@
 
 ## WebMARS — A Modern, Browser-Based MIPS Assembler & Runtime Simulator
 
-**Final Project | Custom Project (Option 4) | Two-Week Sprint**
+**Final Project | Custom Project (Option 4) | 6-Day Final Sprint**
 
 | Field | Value |
 | --- | --- |
 | Team | TBD — see Section 1.2 for suggestions |
 | Members | Landon Clay, Zachary Gass, Bryan Djenabia |
 | Project Type | Option 4 — Custom Project (Approved) |
-| Duration | 14 days, two one-week sprints |
-| Status | Draft v1.0, pending team review |
+| Duration | 6 days — Tue Apr 28 → Sun May 3, 2026 |
+| Final deadline | **Sunday, May 3, 2026** (all deliverables due) |
+| Status | Draft v1.1, schedule compressed to single sprint |
 
 ---
 
@@ -40,7 +41,7 @@ Naming should communicate what the tool is (a MIPS simulator) and what makes it 
 - Deliver a functionally equivalent subset of MARS that runs entirely in a modern web browser, with no installation step.
 - Provide a clean, single-pane interface that lets a student write, assemble, run, and debug a MIPS program without context-switching.
 - Match or exceed MARS on the workflows students perform most often: editing source, stepping through instructions, inspecting registers and memory, and reading console output.
-- Ship a polished, demoable product within the two-week project window, with a clearly defined core scope and well-separated stretch goals.
+- Ship a polished, demoable product by **Sunday, May 3, 2026**, with a clearly defined core scope and well-separated stretch goals.
 
 ### 1.4 Non-Goals
 
@@ -160,47 +161,34 @@ A single-page, three-region layout, sized for a typical 1280×800 laptop screen 
 
 ---
 
-## 6. Two-Week Action Plan
+## 6. 6-Day Action Plan (Tue Apr 28 → Sun May 3, 2026)
 
-Fourteen calendar days, two one-week sprints. Each sprint ends with a demoable build and a brief written status update. Roles below are starting assignments; pair programming and mid-sprint swaps are fine and expected.
+Six calendar days, single compressed sprint, ending in submission on **Sunday, May 3, 2026**. The plan assumes work already in flight: Landon's Day 1–4 lexer/parser/assembler draft (commit `36c14fd`, currently being cleaned up per issue #2) and Bryan's docs and repo setup. Roles below are starting assignments; pair programming and mid-week swaps are expected.
 
 ### 6.1 Roles
 
 | Owner | Responsibilities |
 | --- | --- |
-| **Landon Clay** | Assembler / parser owner. Drives the `/core` lexer, parser, and two-pass assembly logic. Owns the instruction-table and pseudo-instruction expansion. |
+| **Landon Clay** | Assembler / parser owner. Drives the `src/core` lexer, parser, and two-pass assembly logic. Owns the instruction-table and pseudo-instruction expansion. |
 | **Zachary Gass** | Simulator owner. Drives the register file, memory model, instruction execution, and syscall handler. Owns the unit-test golden programs. |
 | **Bryan Djenabia** | UI / integration owner. Drives the Vite scaffold, layout, editor integration, panels, and the Zustand store that bridges UI and core. Owns the deployed build. |
 
-### 6.2 Sprint 1 (Days 1–7): "Make it work"
+### 6.2 Daily breakdown
 
-**Goal:** a build where you can paste a small MIPS program, click Run, and see the registers update. No polish.
+**Goal:** by end of Day 4 (Fri May 1) a user can paste a MIPS program, click Run, and see registers update; Days 5–6 are polish, demo prep, and submission.
 
-| Day | Assembler (Landon) | Simulator (Zachary) | UI / Integration (Bryan) |
-| --- | --- | --- | --- |
-| 1 | Repo setup, type defs for tokens & instructions. | Repo setup, register file & memory module skeletons. | Vite + React + TS + Tailwind scaffold; deploy hello-world to Vercel. |
-| 2 | Lexer: strings, registers, immediates, labels, comments. | Memory model with text/data/stack segments; load/store helpers. | Three-pane layout shell; placeholder panels. |
-| 3 | Parser: produce IR for ~10 core instructions. | Execute first 10 instructions (`add`, `sub`, `addi`, `and`, `or`, `lw`, `sw`, `beq`, `j`, `jal`). | Monaco editor wired in; basic MIPS tokenizer. |
-| 4 | Two-pass assembler: label resolution, machine-code emission. | Step/Run/Reset state machine; PC management. | Zustand store; control bar buttons fire core actions. |
-| 5 | Pseudo-instructions: `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`. | Remaining core instructions; HI/LO; multiply/divide. | Registers panel: live updates, change highlight. |
-| 6 | `.data` / `.text` directives, `.word`, `.asciiz`, `.space`. | Syscalls 1, 4, 5, 8, 10 wired through a console interface. | Memory & Console panels. |
-| 7 | End-to-end integration; assembler error messages with line numbers. | Integration; runtime error messages; unit-test pass for 5 golden programs. | End-of-sprint demo build deployed; status writeup. |
+| Day | Date | Assembler (Landon) | Simulator (Zachary) | UI / Integration (Bryan) |
+| --- | --- | --- | --- | --- |
+| 1 | Tue Apr 28 | Cleanup pass on Day 1–4 draft (issue #2): convert assembler to TypeScript, move files into `src/core/`, fix naming, drop binaries, add `.gitignore`. | Register file + memory module (text/data/stack segments); load/store helpers. | Vite + React + TS + Tailwind scaffold; three-pane layout shell; placeholder panels; deploy hello-world to Vercel. |
+| 2 | Wed Apr 29 | Finalize lexer + parser; pseudo-instruction expansion (`li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`); `.data`/`.text`/`.word`/`.asciiz`/`.space` directives. | Execute first 10 instructions (`add`, `sub`, `addi`, `and`, `or`, `lw`, `sw`, `beq`, `j`, `jal`); Step/Run/Reset state machine; PC management. | Monaco editor wired in with basic MIPS tokenizer; Zustand store; control bar buttons fire core actions. |
+| 3 | Thu Apr 30 | Two-pass assembler end-to-end: label resolution, machine-code emission, assembler error messages with line numbers. | Remaining core instructions; HI/LO; multiply/divide; syscalls 1, 4, 5, 8, 10 wired through a console interface. | Registers panel: live updates and change highlighting. Memory and Console panels. |
+| 4 | Fri May 1 | Integrate parser → assembler → simulator pipeline; fix integration bugs; verify against the 5 golden programs. | Runtime error messages; Vitest pass for sum-1-to-N, factorial, string print, array-sum, syscall I/O. | End-to-end demo build deployed. Status check: every Must-Have in §3.1 minimally functional. |
+| 5 | Sat May 2 | Bug-bash from §3.1 punch list; assembler edge cases (sign extension, negative immediates, branch offsets). | Bug-bash; cross-check golden-program output against real MARS. | UI polish: spacing, typography, monospace fonts. Stretch #1 if time: inline error highlighting (Monaco markers). Stretch #2 if time: dark mode. Cross-browser smoke test (Chrome, Firefox, Safari, Edge). README screenshots/GIFs. |
+| 6 | Sun May 3 **(due)** | Final assembler regression check. | Final simulator regression check. | Final report drafted; demo script written; team dry-run; tag v1.0 in Git; final deploy locked. **Submit.** |
 
-**Sprint 1 exit criteria:** A user can paste any of five canonical MIPS programs (sum-1-to-N, factorial, string print, array-sum, simple syscall I/O) and run them to completion with correct output. Every "Must-Have" feature in section 3.1 is at least minimally functional.
+**Day 4 (Fri May 1) exit criteria — must-haves complete:** a user can paste any of five canonical MIPS programs (sum-1-to-N, factorial, string print, array-sum, simple syscall I/O) and run them to completion with correct output. Every Must-Have feature in §3.1 is at least minimally functional.
 
-### 6.3 Sprint 2 (Days 8–14): "Make it good"
-
-**Goal:** take the working v0.5 from Sprint 1 and turn it into something we are proud to demo.
-
-| Day | Focus |
-| --- | --- |
-| 8 | Bug-bash day. The whole team runs example programs, files issues, triages. No new features. |
-| 9 | Top three bugs from Day 8 fixed. UI polish: spacing, typography, monospace fonts. |
-| 10 | Stretch goal #1: inline error highlighting (Monaco markers tied to assembler errors). |
-| 11 | Stretch goal #2: dark mode with persisted preference. Stretch goal #3 if time: breakpoints. |
-| 12 | Cross-browser test (Chrome, Firefox, Safari, Edge). README, screenshots, GIFs. |
-| 13 | Final report drafted. Demo script written. Dry-run the demo end-to-end as a team. |
-| 14 | Submit. Tag v1.0 in Git. Final deploy locked. Buffer for last-minute fixes only. |
+**Stretch policy:** stretch goals (§3.2) are pursued only on Day 5 and only in priority order. We stop pursuing stretches at noon on Day 6 regardless of how many we hit, so the afternoon is reserved for submission, deploy lock, and buffer.
 
 ---
 
@@ -218,11 +206,12 @@ Fourteen calendar days, two one-week sprints. Each sprint ends with a demoable b
 
 | Risk | Likelihood / Impact | Mitigation |
 | --- | --- | --- |
-| Scope creep ("just one more instruction") | High / High | Frozen instruction list at end of Day 2. New instructions only land if a Core Feature is at risk without them. |
-| Subtle MIPS semantics bug (sign extension, branch delay slots) | Medium / High | Golden-program test suite from Day 3. Cross-check outputs against real MARS for the same inputs. |
-| Monaco / tokenizer rabbit hole | Medium / Medium | Hard time-box: tokenizer is one day. If incomplete, ship with basic highlighting and improve later. |
-| Member unavailable mid-sprint | Medium / Medium | Pair-program in week 1 so every layer has a backup author. Daily 10-minute standup catches blockers early. |
-| Polishing eats time meant for stretch goals | Medium / Low | Stretch goals are explicitly numbered and pursued in order. We stop at the end of Day 11 regardless of how many we hit. |
+| Compressed 6-day timeline | High / High | Daily exit criteria in §6.2. Day 4 (Fri May 1) is a hard checkpoint: if Must-Haves aren't complete, Day 5 cuts all stretches and becomes a second integration day. |
+| Scope creep ("just one more instruction") | High / High | Instruction list (§10.1) is frozen as of Day 1. New instructions only land if a Core Feature is at risk without them. The parser schema currently overshoots and must be trimmed (issue #2). |
+| Subtle MIPS semantics bug (sign extension, branch delay slots) | Medium / High | Golden-program test suite stood up by end of Day 3. Cross-check outputs against real MARS for the same inputs. |
+| Monaco / tokenizer rabbit hole | Medium / Medium | Hard time-box: basic MIPS tokenizer is half of Day 2. If incomplete, ship with default highlighting and improve only on Day 5 if Must-Haves are done. |
+| Member unavailable mid-sprint | Medium / High | With only 6 days, no slack for absences. Pair-program on Days 1–2 so every layer has a backup author. Daily 10-minute standup catches blockers same-day. |
+| Polishing eats time meant for stretch goals | Medium / Low | Stretches are explicitly numbered and pursued in priority order on Day 5 only. Hard stop at noon on Day 6 regardless of how many we hit. |
 
 ---
 
@@ -244,7 +233,7 @@ If we can demo all five live, in front of the instructor, the project has succee
 
 ### 10.1 Initial Instruction Set
 
-Frozen list of instructions targeted for Sprint 1. All others are stretch.
+Frozen list of instructions targeted for v1.0 (must be complete by Day 4, Fri May 1). All others are stretch.
 
 **Arithmetic / Logical:**
 `add`, `addu`, `sub`, `subu`, `addi`, `addiu`, `and`, `or`, `xor`, `nor`, `andi`, `ori`, `xori`, `sll`, `srl`, `sra`, `slt`, `slti`, `sltu`, `mult`, `div`, `mfhi`, `mflo`
