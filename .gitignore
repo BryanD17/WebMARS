@@ -4,3 +4,6 @@ dist/
 .env.local
 .DS_Store
 *.log
+
+# Claude Code local-only state (do not commit personal allowlists/preferences)
+.claude/settings.local.json
