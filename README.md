@@ -38,7 +38,7 @@ The v1.0 release targets the workflows students rely on most.
 
 ## Getting Started
 
-WebMARS is published as a static web build and requires no installation to use. Visit the deployed URL (link to be added at v1.0) and you can begin writing MIPS assembly in your browser.
+WebMARS is published as a static web build and requires no installation to use. Visit the deployed URL — _TBD: Vercel deploy in progress_ — and you can begin writing MIPS assembly in your browser. See [`docs/VERCEL_DEPLOY.md`](./docs/VERCEL_DEPLOY.md) for the deploy walkthrough.
 
 To run the project locally for development, follow the instructions below.
 
