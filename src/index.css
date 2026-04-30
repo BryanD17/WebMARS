@@ -1,1 +1,43 @@
 @import "tailwindcss";
+@import "./ui/tokens.css";
+
+/* Bridge canonical :root tokens into Tailwind v4 theme keys so utility
+   classes like bg-surface-1, text-ink-2, font-display, and rounded-md
+   resolve to the design tokens rather than Tailwind's defaults. */
+@theme inline {
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-divider:   var(--border);
+
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
+  --color-accent: var(--accent);
+  --color-warn:   var(--warn);
+  --color-danger: var(--danger);
+  --color-ok:     var(--ok);
+
+  --font-sans:    var(--font-body);
+  --font-mono:    var(--font-mono);
+  --font-display: var(--font-display);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--surface-0);
+  color: var(--ink-1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
