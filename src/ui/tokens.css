@@ -1,0 +1,30 @@
+/* src/ui/tokens.css — single source of truth for design tokens */
+:root {
+  /* surface */
+  --surface-0: #0a0a0a;        /* page background */
+  --surface-1: #111111;        /* pane background */
+  --surface-2: #1a1a1a;        /* card / inspector tab body */
+  --surface-3: #262626;        /* hover / selected */
+  --border:    #262626;        /* hairlines */
+
+  /* ink */
+  --ink-1:     #fafafa;        /* primary text */
+  --ink-2:     #a1a1aa;        /* secondary text */
+  --ink-3:     #525252;        /* tertiary, disabled */
+
+  /* accent — used SPARINGLY: register-changed flash, run state */
+  --accent:    #22d3ee;        /* cyan-400 */
+  --warn:      #f59e0b;        /* amber-500 — warnings */
+  --danger:    #ef4444;        /* red-500 — errors */
+  --ok:        #10b981;        /* emerald-500 — success */
+
+  /* type */
+  --font-display: "JetBrains Mono", ui-monospace, monospace;
+  --font-body:    "Inter", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  /* rhythm */
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 10px;
+}
