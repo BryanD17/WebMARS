@@ -1,19 +1,20 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useRef, type KeyboardEvent } from 'react'
+import { useSimulator } from '@/hooks/useSimulator.ts'
+import type { InspectorTab } from '@/hooks/types.ts'
 import { cn } from './cn.ts'
 
-const TABS = [
+const TABS: ReadonlyArray<{ id: InspectorTab; label: string }> = [
   { id: 'registers', label: 'Registers' },
   { id: 'memory',    label: 'Memory' },
   { id: 'console',   label: 'Console' },
-] as const
-
-type TabId = (typeof TABS)[number]['id']
+]
 
 export function InspectorPane() {
-  const [active, setActive] = useState<TabId>('registers')
-  const tabRefs = useRef<Map<TabId, HTMLButtonElement>>(new Map())
+  const active = useSimulator((s) => s.inspectorTab)
+  const setActive = useSimulator((s) => s.setInspectorTab)
+  const tabRefs = useRef<Map<InspectorTab, HTMLButtonElement>>(new Map())
 
-  function focusTab(id: TabId) {
+  function focusTab(id: InspectorTab) {
     setActive(id)
     tabRefs.current.get(id)?.focus()
   }
