@@ -1,69 +1,38 @@
-import { useSimulator } from '@/hooks/useSimulator.ts'
-import type { SimStatus } from '@/hooks/types.ts'
-
-const APP_VERSION = 'v0.1.0-dev'
-
-function statusLabel(status: SimStatus): string {
-  switch (status) {
-    case 'idle':       return 'Idle'
-    case 'assembling': return 'Assembling'
-    case 'ready':      return 'Ready'
-    case 'running':    return 'Running'
-    case 'paused':     return 'Paused'
-    case 'halted':     return 'Halted'
-    case 'error':      return 'Error'
-  }
-}
+import { useSimulatorStore } from '../hooks/useSimulator';
 
 export function StatusBar() {
-  const status = useSimulator((s) => s.status)
-  const inspectorTab = useSimulator((s) => s.inspectorTab)
-  const source = useSimulator((s) => s.source)
+  const status = useSimulatorStore(s => s.status);
+  const pc = useSimulatorStore(s => s.pc);
+  const stepCount = useSimulatorStore(s => s.stepCount);
+  const program = useSimulatorStore(s => s.program);
+  const errorMessage = useSimulatorStore(s => s.errorMessage);
 
-  const trackedUppercase = { letterSpacing: '0.06em' } as const
+  const currentLine = program?.sourceMap.get(pc) ?? null;
 
-  const charCount = source.length
-  const lineCount = source === '' ? 0 : source.split('\n').length
+  const statusColor: Record<string, string> = {
+    idle: 'text-gray-500',
+    assembled: 'text-blue-500',
+    running: 'text-green-500',
+    paused: 'text-yellow-500',
+    halted: 'text-purple-500',
+    error: 'text-red-500',
+  };
 
   return (
-    <footer
-      className="grid h-8 grid-cols-[auto_1fr_auto] items-center border-t border-divider bg-surface-1 font-mono text-xs uppercase"
-    >
-      {/* Left: current sim status */}
-      <span
-        className="border-r border-divider px-4 text-ink-2"
-        style={trackedUppercase}
-      >
-        {statusLabel(status)}
+    <div className="flex items-center gap-4 px-4 py-1 bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-600 text-xs font-mono">
+      <span className={statusColor[status] ?? 'text-gray-500'}>
+        {status.toUpperCase()}
       </span>
-
-      {/* Center: live source line + char count. Day 3 replaces this
-         with cycle count + PC. */}
-      <span
-        className="flex items-center gap-1 border-r border-divider px-4"
-        style={trackedUppercase}
-      >
-        <span className="tabular-nums text-ink-2">{charCount}</span>
-        <span className="text-ink-3">chars ·</span>
-        <span className="tabular-nums text-ink-2">{lineCount}</span>
-        <span className="text-ink-3">lines</span>
+      <span className="text-gray-600 dark:text-gray-400">
+        PC: 0x{(pc >>> 0).toString(16).padStart(8, '0')}
       </span>
-
-      {/* Right: build version + active inspector tab. Right padding
-         is 24px (vs 16px elsewhere) so the trailing label clears the
-         inspector's 8px scrollbar gutter when the register table
-         overflows. */}
-      <span className="flex items-center gap-2 pl-4 pr-6">
-        <span className="text-ink-3" style={trackedUppercase}>
-          {APP_VERSION}
-        </span>
-        <span aria-hidden="true" className="text-ink-3">
-          ·
-        </span>
-        <span className="text-ink-2" style={trackedUppercase}>
-          {inspectorTab}
-        </span>
-      </span>
-    </footer>
-  )
+      {currentLine && (
+        <span className="text-gray-600 dark:text-gray-400">Line: {currentLine}</span>
+      )}
+      <span className="text-gray-600 dark:text-gray-400">Steps: {stepCount}</span>
+      {errorMessage && (
+        <span className="text-red-500 ml-2 truncate max-w-xl">{errorMessage}</span>
+      )}
+    </div>
+  );
 }
