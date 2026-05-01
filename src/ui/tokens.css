@@ -60,3 +60,31 @@
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+
+/* ─ scrollbars ─────────────────────────────────────────────────────
+   Style every scrollable surface with the same thin --surface-3 thumb
+   on a transparent track so register tables, tab bodies, and the
+   editor stop pulling Windows / macOS default chrome into screenshots. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}

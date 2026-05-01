@@ -49,8 +49,11 @@ export function StatusBar() {
         <span className="text-ink-3">lines</span>
       </span>
 
-      {/* Right: build version + active inspector tab */}
-      <span className="flex items-center gap-2 px-4">
+      {/* Right: build version + active inspector tab. Right padding
+         is 24px (vs 16px elsewhere) so the trailing label clears the
+         inspector's 8px scrollbar gutter when the register table
+         overflows. */}
+      <span className="flex items-center gap-2 pl-4 pr-6">
         <span className="text-ink-3" style={trackedUppercase}>
           {APP_VERSION}
         </span>
