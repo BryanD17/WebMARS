@@ -233,6 +233,27 @@ Feature branches are cut from `main` and merged via pull request. CI must pass b
 
 WebMARS is inspired by, and built as a tribute to, the original MARS simulator developed by Pete Sanderson and Kenneth Vollmar. We are not affiliated with the original project. Their work has supported MIPS assembly education for over two decades and remains the standard against which we measure correctness.
 
+## AI tools used
+
+This project was developed with the assistance of Claude Code
+(Anthropic), used as a code-generation and pair-programming tool.
+
+The development pattern was: I authored the project plan, the PRD,
+the architecture decisions, the design tokens, the multi-agent
+execution prompts, and the review of every change before it landed
+on a branch. Claude Code generated the corresponding implementation
+under those instructions and committed on my behalf.
+
+All commits in this repository are authored under my git identity
+because I planned, directed, reviewed, and accept responsibility for
+the work. This disclosure exists so that the use of AI tooling is
+part of the public record of the project.
+
+Where Claude Code's contribution is meaningful enough to credit
+specifically, individual commit messages or pull request bodies note
+it. The full Day 1 plan and execution prompts that drove the AI-
+generated portions are tracked in `docs/` for transparency.
+
 ## License
 
 MIT. See [LICENSE](./LICENSE) for the full text.
