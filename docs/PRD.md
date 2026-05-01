@@ -270,6 +270,12 @@ Frozen list of instructions targeted for v1.0 (must be complete by Day 4, Fri Ma
 2. Confirm that the v1.0 instruction subset (Appendix 10.1) is sufficient for the project's grading rubric.
 3. Confirm the form of the final deliverable: live demo, written report, or both.
 
+## 11. AI tooling disclosure
+
+See "AI tools used" in the project README for disclosure of how
+Claude Code (Anthropic) was used in this project. The disclosure
+is part of the project record.
+
 ---
 
 *End of Document*
