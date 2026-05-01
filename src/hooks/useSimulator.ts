@@ -12,6 +12,29 @@ import type {
 
 const MIPS_TEXT_BASE = 0x00400000
 
+// Pre-loaded so the editor never reads as a wireframe on first paint
+// and so screenshots of WebMARS show working code, not an empty pane.
+// The Day 5 examples-dropdown stretch goal will swap this through
+// loadExample().
+const HELLO_MIPS_SOURCE = `# Welcome to WebMARS.
+# This is a working example. Click Assemble, then Run.
+
+.data
+msg:    .asciiz "Hello, MIPS!\\n"
+
+.text
+main:   li      $v0, 4          # syscall 4 = print string
+        la      $a0, msg
+        syscall
+
+        li      $v0, 10         # syscall 10 = exit
+        syscall
+`
+
+const EXAMPLES: Record<string, string> = {
+  hello: HELLO_MIPS_SOURCE,
+}
+
 const initialRegisters: RegisterSnapshot = {
   pc: MIPS_TEXT_BASE,
   hi: 0,
@@ -33,6 +56,7 @@ interface SimulatorState {
   // ─ actions (Zachary and Landon will fill these in) ─
   setSource: (next: string) => void
   setInspectorTab: (tab: InspectorTab) => void
+  loadExample: (name: string) => void
   assemble: () => void
   run: () => void
   step: () => void
@@ -40,7 +64,7 @@ interface SimulatorState {
 }
 
 export const useSimulator = create<SimulatorState>((set) => ({
-  source: '',
+  source: HELLO_MIPS_SOURCE,
   status: 'idle',
   registers: initialRegisters,
   consoleOutput: [],
@@ -50,6 +74,15 @@ export const useSimulator = create<SimulatorState>((set) => ({
 
   setSource: (next) => set({ source: next }),
   setInspectorTab: (tab) => set({ inspectorTab: tab }),
+
+  loadExample: (name) => {
+    const next = EXAMPLES[name]
+    if (next === undefined) {
+      console.warn(`[loadExample] no example registered for "${name}"`)
+      return
+    }
+    set({ source: next })
+  },
 
   // ─ stubs — log + flip status only, no actual execution today ─
   assemble: () => {
