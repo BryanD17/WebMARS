@@ -40,6 +40,9 @@
 
   /* easing */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* shadows */
+  --shadow-press: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* ─ animations ─────────────────────────────────────────────────────── */
