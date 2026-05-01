@@ -17,6 +17,8 @@ import { lex } from "./lexer";
 import { parse } from "./parser";
 import type { ParsedLine, ParsedInstruction, Operand } from "./parser";
 
+const TEXT_BASE = 0x00400000;
+
 // ─── Output Types ─────────────────────────────────────────────────────────────
 
 export interface AssembledLine {
@@ -85,6 +87,34 @@ function parseImmediateValue(val: string): number {
   return parseInt(val, 10);
 }
 
+function processEscapes(raw: string): string {
+  return raw.slice(1, -1).replace(/\\(.)/g, (_, c: string) => {
+    switch (c) {
+      case "n": return "\n";
+      case "t": return "\t";
+      case "r": return "\r";
+      case "0": return "\0";
+      case "\\": return "\\";
+      case '"': return '"';
+      default: return c;
+    }
+  });
+}
+
+function packStringWords(str: string, nullTerm: boolean, startAddr: number): DataWord[] {
+  const bytes: number[] = [];
+  for (const ch of str) bytes.push(ch.charCodeAt(0) & 0xFF);
+  if (nullTerm) bytes.push(0);
+  while (bytes.length % 4 !== 0) bytes.push(0);
+  const words: DataWord[] = [];
+  for (let i = 0; i < bytes.length; i += 4) {
+    const value = (((bytes[i] ?? 0) << 24) | ((bytes[i + 1] ?? 0) << 16) |
+                   ((bytes[i + 2] ?? 0) << 8)  |  (bytes[i + 3] ?? 0)) | 0;
+    words.push({ address: startAddr + i, value });
+  }
+  return words;
+}
+
 function parseOffsetBase(operand: string): [string, string] {
   const parenOpen = operand.indexOf("(");
   const parenClose = operand.indexOf(")");
@@ -108,7 +138,8 @@ function branchOffset(label: string, instrIndex: number, labelMap: Record<string
 function jumpTarget(label: string, labelMap: Record<string, number>): string {
   label = label.trim();
   if (!(label in labelMap)) throw new Error(`Undefined label: ${label}`);
-  return (labelMap[label]! & 0x3ffffff).toString(2).padStart(26, "0");
+  const byteAddr = TEXT_BASE + labelMap[label]! * 4;
+  return ((byteAddr >>> 2) & 0x3ffffff).toString(2).padStart(26, "0");
 }
 
 function toAssembledLine(binary: string, sourceLine: number, sourceText: string): AssembledLine {
@@ -162,16 +193,16 @@ function buildLabelMaps(program: ParsedLine[]): {
           }
           case ".asciiz":
           case ".ascii": {
-            // Each character = 1 byte; align to 4
             for (const op of node.operands) {
-              const str = op.value.slice(1, -1); // strip quotes
-              const bytes = str.length + (node.directive === ".asciiz" ? 1 : 0); // +1 for null
-              const words = Math.ceil(bytes / 4);
               if (pendingDataLabel) {
                 dataLabelMap[pendingDataLabel] = dataAddr;
                 pendingDataLabel = undefined;
               }
-              dataAddr += words * 4;
+              const str = processEscapes(op.value);
+              const nullTerm = node.directive === ".asciiz";
+              const packed = packStringWords(str, nullTerm, dataAddr);
+              for (const dw of packed) dataWords.push(dw);
+              dataAddr += packed.length * 4;
             }
             break;
           }
