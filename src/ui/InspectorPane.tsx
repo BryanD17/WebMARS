@@ -2,6 +2,7 @@ import { useRef, type KeyboardEvent } from 'react'
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import type { InspectorTab } from '@/hooks/types.ts'
 import { cn } from './cn.ts'
+import { RegisterTable } from './RegisterTable.tsx'
 
 const TABS: ReadonlyArray<{ id: InspectorTab; label: string }> = [
   { id: 'registers', label: 'Registers' },
@@ -60,7 +61,7 @@ export function InspectorPane() {
         role="tablist"
         aria-label="Inspector views"
         onKeyDown={handleKeyDown}
-        className="flex border-b border-divider"
+        className="flex h-9 border-b border-divider"
       >
         {TABS.map((tab) => {
           const selected = tab.id === active
@@ -79,12 +80,13 @@ export function InspectorPane() {
               tabIndex={selected ? 0 : -1}
               onClick={() => setActive(tab.id)}
               className={cn(
-                'flex-1 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                'flex-1 border-b-2 px-4 font-mono text-sm uppercase transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
                 selected
-                  ? 'border-accent bg-surface-2 text-ink-1'
-                  : 'border-transparent text-ink-2 hover:bg-surface-2 hover:text-ink-1',
+                  ? 'border-accent text-ink-1'
+                  : 'border-transparent text-ink-3 hover:text-ink-2',
               )}
+              style={{ letterSpacing: '0.06em' }}
             >
               {tab.label}
             </button>
@@ -99,22 +101,26 @@ export function InspectorPane() {
           id={`inspector-panel-${tab.id}`}
           aria-labelledby={`inspector-tab-${tab.id}`}
           hidden={tab.id !== active}
-          className="flex-1 overflow-auto p-4"
+          className="flex-1 overflow-auto p-4 animate-[tab-fade-in_100ms_ease-out]"
         >
-          <PlaceholderCard label={tab.label} />
+          {tab.id === 'registers' && <RegisterTable />}
+          {tab.id === 'memory' && <MemoryPlaceholder />}
+          {tab.id === 'console' && <ConsolePlaceholder />}
         </div>
       ))}
     </aside>
   )
 }
 
-function PlaceholderCard({ label }: { label: string }) {
+// SA-6 commit 4 replaces these with proper empty-state components.
+function MemoryPlaceholder() {
   return (
-    <div className="rounded-md bg-surface-2 p-6">
-      <p className="text-sm font-medium text-ink-1">{label}</p>
-      <p className="mt-2 text-sm italic text-ink-3">
-        Placeholder — populated in upcoming sub-agents.
-      </p>
-    </div>
+    <div className="text-sm text-ink-3 italic">Memory tab placeholder.</div>
+  )
+}
+
+function ConsolePlaceholder() {
+  return (
+    <div className="text-sm text-ink-3 italic">Console tab placeholder.</div>
   )
 }
