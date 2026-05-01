@@ -10,7 +10,14 @@ import type {
   SimStatus,
 } from './types.ts'
 
+// Canonical MIPS conventions: program text starts at 0x00400000 and
+// the stack pointer initializes near the top of the user data segment
+// at 0x7FFFFFFC (the highest 4-byte-aligned address in the stack).
+// Real MARS sets these on reset; matching it here keeps cross-checks
+// against MARS exact and gives Zachary's reset() a single source of
+// truth to import from.
 const MIPS_TEXT_BASE = 0x00400000
+const MIPS_STACK_TOP = 0x7ffffffc
 
 // Pre-loaded so the editor never reads as a wireframe on first paint
 // and so screenshots of WebMARS show working code, not an empty pane.
@@ -39,7 +46,9 @@ const initialRegisters: RegisterSnapshot = {
   pc: MIPS_TEXT_BASE,
   hi: 0,
   lo: 0,
-  gpr: {},
+  gpr: {
+    $sp: MIPS_STACK_TOP,
+  },
   changed: new Set<string>(),
 }
 
