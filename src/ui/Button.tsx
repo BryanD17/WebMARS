@@ -10,20 +10,21 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const BASE =
   'inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ' +
-  'transition-colors select-none ' +
+  'select-none transition-colors duration-[80ms] ease-out ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0 ' +
-  'disabled:cursor-not-allowed'
+  'active:translate-y-[0.5px] active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] ' +
+  'disabled:cursor-not-allowed disabled:active:translate-y-0 disabled:active:shadow-none'
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
     'bg-accent text-surface-0 hover:brightness-110 ' +
-    'disabled:bg-surface-2 disabled:text-ink-3',
+    'disabled:bg-surface-2 disabled:text-ink-3 disabled:hover:brightness-100',
   ghost:
     'bg-surface-2 text-ink-1 hover:bg-surface-3 ' +
-    'disabled:bg-surface-2 disabled:text-ink-3',
+    'disabled:bg-surface-2 disabled:text-ink-3 disabled:hover:bg-surface-2',
   danger:
     'bg-danger text-surface-0 hover:brightness-110 ' +
-    'disabled:bg-surface-2 disabled:text-ink-3',
+    'disabled:bg-surface-2 disabled:text-ink-3 disabled:hover:brightness-100',
 }
 
 export function Button({
