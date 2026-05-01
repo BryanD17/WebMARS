@@ -3,6 +3,8 @@ import { useSimulator } from '@/hooks/useSimulator.ts'
 import type { InspectorTab } from '@/hooks/types.ts'
 import { cn } from './cn.ts'
 import { RegisterTable } from './RegisterTable.tsx'
+import { MemoryEmpty } from './MemoryEmpty.tsx'
+import { ConsoleEmpty } from './ConsoleEmpty.tsx'
 
 const TABS: ReadonlyArray<{ id: InspectorTab; label: string }> = [
   { id: 'registers', label: 'Registers' },
@@ -104,23 +106,10 @@ export function InspectorPane() {
           className="flex-1 overflow-auto p-4 animate-[tab-fade-in_100ms_ease-out]"
         >
           {tab.id === 'registers' && <RegisterTable />}
-          {tab.id === 'memory' && <MemoryPlaceholder />}
-          {tab.id === 'console' && <ConsolePlaceholder />}
+          {tab.id === 'memory' && <MemoryEmpty />}
+          {tab.id === 'console' && <ConsoleEmpty />}
         </div>
       ))}
     </aside>
-  )
-}
-
-// SA-6 commit 4 replaces these with proper empty-state components.
-function MemoryPlaceholder() {
-  return (
-    <div className="text-sm text-ink-3 italic">Memory tab placeholder.</div>
-  )
-}
-
-function ConsolePlaceholder() {
-  return (
-    <div className="text-sm text-ink-3 italic">Console tab placeholder.</div>
   )
 }
