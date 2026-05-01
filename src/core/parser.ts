@@ -79,9 +79,10 @@ const INSTRUCTION_SCHEMA: Record<string, OperandKind[]> = {
   // Shift: rd, rt, shamt
   sll:   ["R","R","I"], srl:   ["R","R","I"], sra:   ["R","R","I"],
   // Variable shift: rd, rt, rs
+  sllv:  ["R","R","R"], srlv: ["R","R","R"],
   // HI/LO ops: rs, rt
-  mult:  ["R","R"],
-  div:   ["R","R"], 
+  mult:  ["R","R"], multu: ["R","R"],
+  div:   ["R","R"], divu:  ["R","R"],
   // Move from HI/LO: rd
   mfhi:  ["R"], mflo: ["R"],
   // Jump register
@@ -89,11 +90,11 @@ const INSTRUCTION_SCHEMA: Record<string, OperandKind[]> = {
   // I-type: rt, rs, imm
   addi:  ["R","R","I"], addiu: ["R","R","I"],
   andi:  ["R","R","I"], ori:   ["R","R","I"],
-  xori:  ["R","R","I"], slti:  ["R","R","I"], 
+  xori:  ["R","R","I"], slti:  ["R","R","I"], sltiu: ["R","R","I"],
   lui:   ["R","I"],
   // Load/store: rt, offset(base)
-  lw:    ["R","OB"], lh:  ["R","OB"], 
-  lb:    ["R","OB"], 
+  lw:    ["R","OB"], lh:  ["R","OB"], lhu: ["R","OB"],
+  lb:    ["R","OB"], lbu: ["R","OB"],
   sw:    ["R","OB"], sh:  ["R","OB"], sb:  ["R","OB"],
   // Branch: rs, rt, label  (blez/bgtz/bltz/bgez only have rs)
   beq:   ["R","R","L"], bne:  ["R","R","L"],
@@ -108,6 +109,7 @@ const INSTRUCTION_SCHEMA: Record<string, OperandKind[]> = {
   li:    ["R","I"],
   la:    ["R","L"],
   move:  ["R","R"],
+  mul:   ["R","R","R"],
   neg:   ["R","R"], not: ["R","R"],
   // No operands
   nop:      [],

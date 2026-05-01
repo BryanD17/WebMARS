@@ -100,6 +100,8 @@ function branchOffset(label: string, instrIndex: number, labelMap: Record<string
   label = label.trim();
   if (!(label in labelMap)) throw new Error(`Undefined label: ${label}`);
   const offset = labelMap[label]! - (instrIndex + 1);
+  if (offset < -32768 || offset > 32767)
+    throw new Error(`Branch to '${label}' out of range (${offset} instructions)`);
   return (offset & 0xffff).toString(2).padStart(16, "0");
 }
 
@@ -201,7 +203,7 @@ function buildLabelMaps(program: ParsedLine[]): {
 
     if (node.kind === "instruction" && !inData) {
       // la expands to 2 instructions
-      instrIndex += node.mnemonic === "la" ? 2 : 1;
+      instrIndex += (node.mnemonic === "la" || node.mnemonic === "mul") ? 2 : 1;
       // pseudo-branches expand to 2 instructions
       if (["blt","ble","bgt","bge"].includes(node.mnemonic)) instrIndex++;
     }
@@ -328,10 +330,16 @@ function translateIR(
       const upper = ((addr >>> 16) & 0xffff).toString(2).padStart(16, "0");
       const lower = (addr & 0xffff).toString(2).padStart(16, "0");
       return [
-        "00111100000" + reg(op0) + upper,  // lui $rt, upper
-        "00110100000" + reg(op0) + lower,  // ori $rt, $rt, lower
+        "00111100000" + reg(op0) + upper,           // lui $rt, upper16
+        "001101" + reg(op0) + reg(op0) + lower,     // ori $rt, $rt, lower16
       ];
     }
+
+    // ── Pseudo: mul rd, rs, rt  →  mult rs, rt  +  mflo rd ──────────────────
+    case "mul": return [
+      "000000" + reg(op1) + reg(op2) + "0000000000011000",  // mult rs, rt
+      "0000000000000000" + reg(op0) + "00000010010",         // mflo rd
+    ];
 
     // ── J-type ───────────────────────────────────────────────────────────────
     case "j":   return ["000010" + jumpTarget(op0, labelMap)];
