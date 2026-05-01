@@ -1,0 +1,90 @@
+/* src/ui/tokens.css — single source of truth for design tokens */
+:root {
+  /* surface */
+  --surface-0:    #0a0a0a;        /* page background */
+  --surface-1:    #111111;        /* pane background */
+  --surface-2:    #1a1a1a;        /* card / inspector tab body */
+  --surface-3:    #262626;        /* hover / selected */
+  --surface-elev: #0d0d0d;        /* dev panel, status pill — slightly lifted */
+  --gutter:       #0e0e0e;        /* editor line-number rail */
+  --column-guide: #1f1f1f;        /* faint 80-col rule in the editor */
+  --border:       #262626;        /* hairlines */
+
+  /* ink */
+  --ink-1: #fafafa;               /* primary text */
+  --ink-2: #a1a1aa;               /* secondary text */
+  --ink-3: #525252;               /* tertiary, disabled */
+
+  /* accent — used SPARINGLY: register-changed flash, run state */
+  --accent: #22d3ee;              /* cyan-400 */
+  --warn:   #f59e0b;              /* amber-500 — warnings */
+  --danger: #ef4444;              /* red-500 — errors */
+  --ok:     #10b981;              /* emerald-500 — success */
+
+  /* type */
+  --font-display: "JetBrains Mono", ui-monospace, monospace;
+  --font-body:    "Inter", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  /* type scale (use these, don't sprinkle px values) */
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-lg:   14px;
+
+  /* rhythm */
+  --radius-sm:   4px;
+  --radius:      6px;
+  --radius-lg:   10px;
+  --radius-pill: 9999px;
+
+  /* easing */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* shadows */
+  --shadow-press: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ─ animations ─────────────────────────────────────────────────────── */
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+@keyframes tab-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─ scrollbars ─────────────────────────────────────────────────────
+   Style every scrollable surface with the same thin --surface-3 thumb
+   on a transparent track so register tables, tab bodies, and the
+   editor stop pulling Windows / macOS default chrome into screenshots. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}
