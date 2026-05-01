@@ -1,238 +1,264 @@
-import { create } from 'zustand';
-import { Simulator } from '../core/simulator';
-import { assemble } from '../core/instructions';
-import { TEXT_BASE, DATA_BASE } from '../core/memory';
-import type { AssembledProgram, SimulatorStatus } from '../core/types';
+import { create } from 'zustand'
+import { Simulator } from '../core/simulator.ts'
+import { assemble } from '../core/instructions.ts'
+import { REGISTER_NAMES } from '../core/registers.ts'
+import type { AssembledProgram } from '../core/types.ts'
+import type {
+  AssemblerError,
+  InspectorTab,
+  RegisterSnapshot,
+  RuntimeError,
+  SimStatus,
+} from './types.ts'
 
-interface InputRequest {
-  type: 'int' | 'string';
-  maxLen?: number;
-  resolve: (val: string) => void;
+const MIPS_TEXT_BASE = 0x00400000
+const MIPS_STACK_TOP = 0x7ffffffc
+
+const HELLO_MIPS_SOURCE = `# Welcome to WebMARS.
+# This is a working example. Click Assemble, then Run.
+
+.data
+msg:    .asciiz "Hello, MIPS!\\n"
+
+.text
+main:   li      $v0, 4          # syscall 4 = print string
+        la      $a0, msg
+        syscall
+
+        li      $v0, 10         # syscall 10 = exit
+        syscall
+`
+
+const EXAMPLES: Record<string, string> = {
+  hello: HELLO_MIPS_SOURCE,
 }
 
-interface SimulatorStore {
-  status: SimulatorStatus;
-  registers: number[];
-  hi: number;
-  lo: number;
-  pc: number;
-  lastChangedRegisters: Set<number>;
-  consoleOutput: string;
-  errorMessage: string | null;
-  stepCount: number;
-  memoryDump: { addr: number; word: number }[];
-  memoryViewAddr: number;
-  program: AssembledProgram | null;
-  inputRequest: InputRequest | null;
-  source: string;
-
-  setSource: (src: string) => void;
-  assemble: (source: string) => void;
-  step: () => Promise<void>;
-  run: () => Promise<void>;
-  reset: () => void;
-  stop: () => void;
-  setMemoryViewAddr: (addr: number) => void;
-  submitInput: (val: string) => void;
-  appendConsole: (s: string) => void;
-}
-
-let _sim: Simulator | null = null;
-let _stopFlag = false;
-
-function getOrCreateSim(store: SimulatorStore, set: (s: Partial<SimulatorStore>) => void, get: () => SimulatorStore): Simulator {
-  if (!_sim) {
-    _sim = new Simulator({
-      print: (s) => {
-        set({ consoleOutput: get().consoleOutput + s });
-      },
-      readInt: () => new Promise<number>((resolve) => {
-        set({
-          inputRequest: {
-            type: 'int',
-            resolve: (val: string) => resolve(parseInt(val, 10) || 0),
-          }
-        });
-      }),
-      readString: (maxLen: number) => new Promise<string>((resolve) => {
-        set({
-          inputRequest: {
-            type: 'string',
-            maxLen,
-            resolve: (val: string) => resolve(val),
-          }
-        });
-      }),
-      exit: () => {
-        _stopFlag = true;
-        set({ status: 'halted' });
-      },
-    });
+function buildInitialGpr(): Record<string, number> {
+  const gpr: Record<string, number> = {}
+  for (const name of REGISTER_NAMES) {
+    gpr[name] = 0
   }
-  return _sim;
+  gpr['$sp'] = MIPS_STACK_TOP
+  return gpr
 }
 
-export const useSimulatorStore = create<SimulatorStore>((set, get) => ({
-  status: 'idle',
-  registers: new Array(32).fill(0),
+const initialRegisters: RegisterSnapshot = {
+  pc: MIPS_TEXT_BASE,
   hi: 0,
   lo: 0,
-  pc: TEXT_BASE,
-  lastChangedRegisters: new Set(),
-  consoleOutput: '',
-  errorMessage: null,
-  stepCount: 0,
-  memoryDump: [],
-  memoryViewAddr: DATA_BASE,
-  program: null,
-  inputRequest: null,
-  source: '',
+  gpr: buildInitialGpr(),
+  changed: new Set<string>(),
+}
 
-  setSource: (src) => set({ source: src }),
+// Translate the engine's numeric-index lastChangedRegisters + prev/next
+// pc/hi/lo into the contract's named Set<string>.
+function buildChangedSet(
+  engineState: { registers: number[]; hi: number; lo: number; pc: number; lastChangedRegisters: Set<number> },
+  prev: RegisterSnapshot,
+): Set<string> {
+  const changed = new Set<string>()
+  for (const idx of engineState.lastChangedRegisters) {
+    const name = REGISTER_NAMES[idx]
+    if (name !== undefined) changed.add(name)
+  }
+  if (engineState.pc !== prev.pc) changed.add('pc')
+  if (engineState.hi !== prev.hi) changed.add('hi')
+  if (engineState.lo !== prev.lo) changed.add('lo')
+  return changed
+}
 
-  assemble: (source) => {
-    const program = assemble(source);
-    if (program.errors.length > 0) {
-      set({
-        status: 'error',
-        errorMessage: program.errors.map(e => `Line ${e.line}: ${e.message}`).join('; '),
-        program,
-      });
-      return;
-    }
-    _sim = null;
-    _stopFlag = false;
-    const sim = getOrCreateSim(get(), set, get);
-    sim.load(program);
-    const state = sim.getState();
-    set({
-      status: 'assembled',
-      program,
-      registers: state.registers,
-      hi: state.hi,
-      lo: state.lo,
-      pc: state.pc,
-      lastChangedRegisters: new Set(),
-      consoleOutput: '',
-      errorMessage: null,
-      stepCount: 0,
-      memoryDump: sim.memoryDump(get().memoryViewAddr, 32),
-    });
-  },
+function buildSnapshot(
+  engineState: { registers: number[]; hi: number; lo: number; pc: number; lastChangedRegisters: Set<number> },
+  prev: RegisterSnapshot,
+): RegisterSnapshot {
+  const gpr: Record<string, number> = {}
+  for (let i = 0; i < REGISTER_NAMES.length; i++) {
+    const name = REGISTER_NAMES[i]
+    if (name !== undefined) gpr[name] = engineState.registers[i] ?? 0
+  }
+  return {
+    pc: engineState.pc,
+    hi: engineState.hi,
+    lo: engineState.lo,
+    gpr,
+    changed: buildChangedSet(engineState, prev),
+  }
+}
 
-  step: async () => {
-    const { status } = get();
-    if (status !== 'assembled' && status !== 'paused') return;
-    const sim = getOrCreateSim(get(), set, get);
-    try {
-      set({ status: 'running' });
-      await sim.step();
-      const state = sim.getState();
-      set({
-        status: sim.isHalted() ? 'halted' : 'paused',
-        registers: state.registers,
-        hi: state.hi,
-        lo: state.lo,
-        pc: state.pc,
-        lastChangedRegisters: state.lastChangedRegisters,
-        stepCount: state.stepCount,
-        memoryDump: sim.memoryDump(get().memoryViewAddr, 32),
-        inputRequest: null,
-      });
-    } catch (e: unknown) {
-      set({ status: 'error', errorMessage: (e as Error).message });
-    }
-  },
+// Engine-level AssemblerError → contract AssemblerError (same shape, different source)
+function toContractErrors(errs: { line: number; message: string }[]): AssemblerError[] {
+  return errs.map((e) => ({ line: e.line, message: e.message }))
+}
 
-  run: async () => {
-    const { status } = get();
-    if (status !== 'assembled' && status !== 'paused') return;
-    const sim = getOrCreateSim(get(), set, get);
-    _stopFlag = false;
-    set({ status: 'running' });
+interface SimulatorStoreState {
+  // ─ contract fields (must match src/hooks/types.ts) ─
+  source: string
+  status: SimStatus
+  registers: RegisterSnapshot
+  consoleOutput: string[]
+  assemblerErrors: AssemblerError[]
+  runtimeError: RuntimeError | null
+  inspectorTab: InspectorTab
 
-    try {
-      for (let i = 0; i < 1_000_000 && !sim.isHalted() && !_stopFlag; i++) {
-        await sim.step();
-        if (i % 1000 === 0) {
-          const state = sim.getState();
-          set({
-            registers: state.registers,
-            hi: state.hi,
-            lo: state.lo,
-            pc: state.pc,
-            lastChangedRegisters: state.lastChangedRegisters,
-            stepCount: state.stepCount,
-          });
-          await new Promise(r => setTimeout(r, 0));
-        }
-        if (get().inputRequest) {
-          // Pause for input
-          await new Promise<void>(resolve => {
-            const unsub = useSimulatorStore.subscribe((s) => {
-              if (!s.inputRequest) { unsub(); resolve(); }
-            });
-          });
-        }
+  // ─ contract actions ─
+  setSource: (next: string) => void
+  setInspectorTab: (tab: InspectorTab) => void
+  loadExample: (name: string) => void
+  assemble: () => void
+  run: () => void
+  step: () => void
+  reset: () => void
+
+  // ─ extensions (engine-specific, not required by contract) ─
+  stop: () => void
+  program: AssembledProgram | null
+}
+
+let _sim: Simulator | null = null
+let _stopFlag = false
+
+export const useSimulator = create<SimulatorStoreState>((set, get) => {
+  function makeSim(): Simulator {
+    if (_sim) return _sim
+    _sim = new Simulator({
+      print: (s) => {
+        set((state) => ({ consoleOutput: [...state.consoleOutput, s] }))
+      },
+      // I/O syscalls (5, 8) stubbed — full console wiring is a Day 5 task.
+      readInt: () => Promise.resolve(0),
+      readString: () => Promise.resolve(''),
+      exit: () => {
+        _stopFlag = true
+      },
+    })
+    return _sim
+  }
+
+  return {
+    source: HELLO_MIPS_SOURCE,
+    status: 'idle',
+    registers: initialRegisters,
+    consoleOutput: [],
+    assemblerErrors: [],
+    runtimeError: null,
+    inspectorTab: 'registers',
+    program: null,
+
+    setSource: (next) => set({ source: next }),
+
+    setInspectorTab: (tab) => set({ inspectorTab: tab }),
+
+    loadExample: (name) => {
+      const next = EXAMPLES[name]
+      if (next === undefined) {
+        console.warn(`[loadExample] no example registered for "${name}"`)
+        return
       }
-      const state = sim.getState();
+      set({ source: next })
+    },
+
+    assemble: () => {
+      const source = get().source
+      const program = assemble(source)
+      if (program.errors.length > 0) {
+        set({
+          status: 'error',
+          assemblerErrors: toContractErrors(program.errors),
+          runtimeError: null,
+        })
+        return
+      }
+      _sim = null
+      _stopFlag = false
+      const sim = makeSim()
+      sim.load(program)
+      const engineState = sim.getState()
       set({
-        status: sim.isHalted() ? 'halted' : _stopFlag ? 'paused' : 'paused',
-        registers: state.registers,
-        hi: state.hi,
-        lo: state.lo,
-        pc: state.pc,
-        lastChangedRegisters: state.lastChangedRegisters,
-        stepCount: state.stepCount,
-        memoryDump: sim.memoryDump(get().memoryViewAddr, 32),
-        inputRequest: null,
-      });
-    } catch (e: unknown) {
-      set({ status: 'error', errorMessage: (e as Error).message });
-    }
-  },
+        status: 'ready',
+        program,
+        registers: buildSnapshot(engineState, initialRegisters),
+        consoleOutput: [],
+        assemblerErrors: [],
+        runtimeError: null,
+      })
+    },
 
-  reset: () => {
-    _stopFlag = true;
-    const sim = _sim;
-    if (sim) sim.reset();
-    const state = sim?.getState();
-    set({
-      status: 'assembled',
-      registers: state?.registers ?? new Array(32).fill(0),
-      hi: 0,
-      lo: 0,
-      pc: TEXT_BASE,
-      lastChangedRegisters: new Set(),
-      consoleOutput: '',
-      errorMessage: null,
-      stepCount: 0,
-      inputRequest: null,
-      memoryDump: sim ? sim.memoryDump(get().memoryViewAddr, 32) : [],
-    });
-    _stopFlag = false;
-  },
+    step: () => {
+      const { status, registers: prevRegisters } = get()
+      if (status !== 'ready' && status !== 'paused') return
+      const sim = makeSim()
+      void (async () => {
+        try {
+          set({ status: 'running' })
+          await sim.step()
+          const engineState = sim.getState()
+          set({
+            status: sim.isHalted() ? 'halted' : 'paused',
+            registers: buildSnapshot(engineState, prevRegisters),
+          })
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : String(e)
+          set({
+            status: 'error',
+            runtimeError: { pc: get().registers.pc, message },
+          })
+        }
+      })()
+    },
 
-  stop: () => {
-    _stopFlag = true;
-    set({ status: 'paused' });
-  },
+    run: () => {
+      const { status } = get()
+      if (status !== 'ready' && status !== 'paused') return
+      const sim = makeSim()
+      _stopFlag = false
+      set({ status: 'running' })
+      void (async () => {
+        try {
+          for (let i = 0; i < 1_000_000 && !sim.isHalted() && !_stopFlag; i++) {
+            const prevRegisters = get().registers
+            await sim.step()
+            if (i % 500 === 0) {
+              const engineState = sim.getState()
+              set({ registers: buildSnapshot(engineState, prevRegisters) })
+              await new Promise<void>((r) => setTimeout(r, 0))
+            }
+          }
+          const engineState = sim.getState()
+          const prevRegisters = get().registers
+          set({
+            status: sim.isHalted() ? 'halted' : _stopFlag ? 'paused' : 'paused',
+            registers: buildSnapshot(engineState, prevRegisters),
+          })
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : String(e)
+          set({
+            status: 'error',
+            runtimeError: { pc: get().registers.pc, message },
+          })
+        }
+      })()
+    },
 
-  setMemoryViewAddr: (addr) => {
-    const sim = _sim;
-    set({
-      memoryViewAddr: addr,
-      memoryDump: sim ? sim.memoryDump(addr, 32) : [],
-    });
-  },
+    reset: () => {
+      _stopFlag = true
+      const sim = _sim
+      if (sim) sim.reset()
+      const engineState = sim?.getState()
+      set({
+        status: sim ? 'ready' : 'idle',
+        registers: engineState
+          ? buildSnapshot(engineState, initialRegisters)
+          : initialRegisters,
+        consoleOutput: [],
+        assemblerErrors: [],
+        runtimeError: null,
+      })
+      _stopFlag = false
+    },
 
-  submitInput: (val) => {
-    const { inputRequest } = get();
-    if (inputRequest) {
-      inputRequest.resolve(val);
-      set({ inputRequest: null });
-    }
-  },
-
-  appendConsole: (s) => set({ consoleOutput: get().consoleOutput + s }),
-}));
+    stop: () => {
+      _stopFlag = true
+      set({ status: 'paused' })
+    },
+  }
+})

@@ -10,12 +10,14 @@ export const REGISTER_NAMES: string[] = [
 
 export const REGISTER_INDEX: Record<string, number> = {};
 REGISTER_NAMES.forEach((name, i) => { REGISTER_INDEX[name] = i; });
-for (let i = 0; i < 32; i++) REGISTER_INDEX[`$${i}`] = i;
+for (let i = 0; i < 32; i++) { REGISTER_INDEX[`$${i}`] = i; }
 
 export function createRegisterFile(): number[] {
   const regs = new Array<number>(32).fill(0);
-  regs[REGISTER_INDEX['$sp']] = 0x7fffeffc;
-  regs[REGISTER_INDEX['$gp']] = 0x10008000;
+  const spIdx = REGISTER_INDEX['$sp'] ?? 29;
+  const gpIdx = REGISTER_INDEX['$gp'] ?? 28;
+  regs[spIdx] = 0x7fffeffc;
+  regs[gpIdx] = 0x10008000;
   return regs;
 }
 

@@ -61,10 +61,10 @@ export class Memory {
 
   loadProgram(instructions: number[], dataBytes: Uint8Array): void {
     for (let i = 0; i < instructions.length; i++) {
-      this.view.setInt32(this.offset(TEXT_BASE + i * 4), instructions[i], false);
+      this.view.setInt32(this.offset(TEXT_BASE + i * 4), instructions[i] ?? 0, false);
     }
     for (let i = 0; i < dataBytes.length; i++) {
-      this.view.setUint8(this.offset(DATA_BASE + i), dataBytes[i]);
+      this.view.setUint8(this.offset(DATA_BASE + i), dataBytes[i] ?? 0);
     }
   }
 

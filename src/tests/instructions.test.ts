@@ -40,23 +40,6 @@ function jType(op: number, target: number): number {
 let sim: Simulator;
 beforeEach(() => { sim = new Simulator(makeIO()); });
 
-async function run1(instr: number, setupRegs?: (r: number[]) => void): Promise<number[]> {
-  // syscall 10 (exit) after the instruction to halt
-  const exitInstr = rType(0, 0, 0, 0, 0, 0x0c); // syscall
-  const io: SyscallIO = { print: () => {}, readInt: () => Promise.resolve(0), readString: () => Promise.resolve(''), exit: () => {} };
-  const s = new Simulator({ ...io, exit: () => {} });
-  // We'll just load a 1-instruction program and step once
-  const prog = makeProgram([instr]);
-  s.load(prog);
-  if (setupRegs) {
-    const state = s.getState();
-    setupRegs(state.registers);
-    // Re-load to apply register state — we can't easily set regs externally,
-    // so we'll set via a move trick. Instead, just step and read state.
-  }
-  await s.step();
-  return s.getState().registers;
-}
 
 describe('R-type arithmetic', () => {
   it('add: 3 + 4 = 7', async () => {

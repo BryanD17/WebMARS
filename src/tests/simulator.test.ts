@@ -109,8 +109,7 @@ describe('Runtime errors', () => {
   });
 
   it('step after halt is a no-op', async () => {
-    let exited = false;
-    const s = new Simulator(makeIO({ exit: () => { exited = true; } }));
+    const s = new Simulator(makeIO({ exit: () => {} }));
     s.load(makeProgram([
       iType(0x09, 0, 2, 10),
       rType(0, 0, 0, 0, 0, 0x0c),

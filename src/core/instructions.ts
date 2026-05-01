@@ -1,6 +1,6 @@
 import { REGISTER_INDEX } from './registers';
 import { TEXT_BASE, DATA_BASE } from './memory';
-import type { AssembledProgram, AssemblerError } from './types';
+import type { AssembledProgram, EngineAssemblerError } from './types';
 
 interface Token {
   type: 'label' | 'directive' | 'mnemonic' | 'register' | 'immediate' | 'string' | 'comma' | 'lparen' | 'rparen' | 'ident';
@@ -31,7 +31,7 @@ function tokenizeLine(line: string, lineNum: number): Token[] {
 
     const match = s.match(/^([^\s,()#"]+)/);
     if (!match) break;
-    const word = match[1];
+    const word = match[1]!;
     s = s.slice(word.length);
 
     if (word.endsWith(':')) {
@@ -54,7 +54,7 @@ function parseImm(s: string): number {
   return parseInt(s, 10);
 }
 
-function getReg(tok: Token | undefined, errors: AssemblerError[]): number {
+function getReg(tok: Token | undefined, errors: EngineAssemblerError[]): number {
   if (!tok || tok.type !== 'register') {
     errors.push({ line: tok?.line ?? 0, message: `Expected register, got ${tok?.value}` });
     return 0;
@@ -80,7 +80,7 @@ function jType(op: number, target: number): number {
 }
 
 export function assemble(source: string): AssembledProgram {
-  const errors: AssemblerError[] = [];
+  const errors: EngineAssemblerError[] = [];
   const labels = new Map<string, number>();
   const sourceMap = new Map<number, number>();
   const instructions: number[] = [];
@@ -100,13 +100,13 @@ export function assemble(source: string): AssembledProgram {
   // a mnemonic — subsequent idents are label operands (e.g. "j loop", "la $t0, arr").
   const allTokens: Token[][] = [];
   for (let i = 0; i < lines.length; i++) {
-    const toks = tokenizeLine(lines[i], i + 1);
+    const toks = tokenizeLine(lines[i] ?? '', i + 1);
     allTokens.push(toks);
 
     let mnemonicSeen = false;
 
     for (let j = 0; j < toks.length; j++) {
-      const tok = toks[j];
+      const tok = toks[j]!;
 
       if (tok.type === 'label') {
         labels.set(tok.value, inText ? textAddr : dataAddr);
@@ -117,7 +117,7 @@ export function assemble(source: string): AssembledProgram {
           if (tok.value === '.word') {
             let k = j + 1, count = 0;
             while (k < toks.length) {
-              if (toks[k].type === 'immediate' || toks[k].type === 'ident') count++;
+              if (toks[k]!.type === 'immediate' || toks[k]!.type === 'ident') count++;
               k++;
               if (k < toks.length && toks[k]?.type === 'comma') k++;
             }
@@ -131,7 +131,7 @@ export function assemble(source: string): AssembledProgram {
           } else if (tok.value === '.byte') {
             let k = j + 1, count = 0;
             while (k < toks.length) {
-              if (toks[k].type === 'immediate') count++;
+              if (toks[k]!.type === 'immediate') count++;
               k++;
               if (k < toks.length && toks[k]?.type === 'comma') k++;
             }
@@ -139,7 +139,7 @@ export function assemble(source: string): AssembledProgram {
           } else if (tok.value === '.half') {
             let k = j + 1, count = 0;
             while (k < toks.length) {
-              if (toks[k].type === 'immediate') count++;
+              if (toks[k]!.type === 'immediate') count++;
               k++;
               if (k < toks.length && toks[k]?.type === 'comma') k++;
             }
@@ -167,17 +167,16 @@ export function assemble(source: string): AssembledProgram {
     }
   }
 
-  // Reset for second pass
+  // Reset for second pass (dataAddr not needed — second pass emits to dataBytes directly)
   inText = true;
   textAddr = TEXT_BASE;
-  dataAddr = DATA_BASE;
 
   for (let i = 0; i < lines.length; i++) {
-    const toks = allTokens[i];
+    const toks = allTokens[i]!;
     let j = 0;
 
     while (j < toks.length) {
-      const tok = toks[j];
+      const tok = toks[j]!;
 
       if (tok.type === 'label') { j++; continue; }
 
@@ -198,7 +197,7 @@ export function assemble(source: string): AssembledProgram {
           if (dir === '.word') {
             j++;
             while (j < toks.length) {
-              const v = toks[j];
+              const v = toks[j]!;
               if (v.type === 'immediate') {
                 const val = parseImm(v.value);
                 dataBytes.push((val >>> 24) & 0xff, (val >>> 16) & 0xff, (val >>> 8) & 0xff, val & 0xff);
@@ -215,7 +214,7 @@ export function assemble(source: string): AssembledProgram {
           if (dir === '.byte') {
             j++;
             while (j < toks.length) {
-              const v = toks[j];
+              const v = toks[j]!;
               if (v.type === 'immediate') { dataBytes.push(parseImm(v.value) & 0xff); j++; }
               else if (v.type === 'comma') { j++; }
               else break;
@@ -225,7 +224,7 @@ export function assemble(source: string): AssembledProgram {
           if (dir === '.half') {
             j++;
             while (j < toks.length) {
-              const v = toks[j];
+              const v = toks[j]!;
               if (v.type === 'immediate') {
                 const val = parseImm(v.value) & 0xffff;
                 dataBytes.push((val >>> 8) & 0xff, val & 0xff);
@@ -327,7 +326,7 @@ export function assemble(source: string): AssembledProgram {
           case 'lw':  {
             const rt2 = getR(0);
             const immTok = nextToks[2];
-            let base = 0, offset = 0;
+            let base: number, offset: number;
             if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
               offset = parseImm(immTok.value);
               base = getReg(nextToks[4], errors);
@@ -338,7 +337,7 @@ export function assemble(source: string): AssembledProgram {
           case 'sw': {
             const rt2 = getR(0);
             const immTok = nextToks[2];
-            let base = 0, offset = 0;
+            let base: number, offset: number;
             if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
               offset = parseImm(immTok.value);
               base = getReg(nextToks[4], errors);
@@ -349,7 +348,7 @@ export function assemble(source: string): AssembledProgram {
           case 'lh': {
             const rt2 = getR(0);
             const immTok = nextToks[2];
-            let base = 0, offset = 0;
+            let base: number, offset: number;
             if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
               offset = parseImm(immTok.value);
               base = getReg(nextToks[4], errors);
@@ -360,7 +359,7 @@ export function assemble(source: string): AssembledProgram {
           case 'lhu': {
             const rt2 = getR(0);
             const immTok = nextToks[2];
-            let base = 0, offset = 0;
+            let base: number, offset: number;
             if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
               offset = parseImm(immTok.value);
               base = getReg(nextToks[4], errors);
@@ -371,7 +370,7 @@ export function assemble(source: string): AssembledProgram {
           case 'sh': {
             const rt2 = getR(0);
             const immTok = nextToks[2];
-            let base = 0, offset = 0;
+            let base: number, offset: number;
             if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
               offset = parseImm(immTok.value);
               base = getReg(nextToks[4], errors);
@@ -382,7 +381,7 @@ export function assemble(source: string): AssembledProgram {
           case 'lb': {
             const rt2 = getR(0);
             const immTok = nextToks[2];
-            let base = 0, offset = 0;
+            let base: number, offset: number;
             if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
               offset = parseImm(immTok.value);
               base = getReg(nextToks[4], errors);
@@ -393,7 +392,7 @@ export function assemble(source: string): AssembledProgram {
           case 'lbu': {
             const rt2 = getR(0);
             const immTok = nextToks[2];
-            let base = 0, offset = 0;
+            let base: number, offset: number;
             if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
               offset = parseImm(immTok.value);
               base = getReg(nextToks[4], errors);
@@ -404,7 +403,7 @@ export function assemble(source: string): AssembledProgram {
           case 'sb': {
             const rt2 = getR(0);
             const immTok = nextToks[2];
-            let base = 0, offset = 0;
+            let base: number, offset: number;
             if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
               offset = parseImm(immTok.value);
               base = getReg(nextToks[4], errors);
@@ -497,7 +496,6 @@ export function assemble(source: string): AssembledProgram {
           case 'nop': instr = 0; consumed = 0; break;
           default:
             errors.push({ line, message: `Unknown mnemonic: ${mnemonic}` });
-            consumed = 0;
         }
 
         instructions.push(instr);
