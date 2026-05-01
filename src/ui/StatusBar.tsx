@@ -18,8 +18,12 @@ function statusLabel(status: SimStatus): string {
 export function StatusBar() {
   const status = useSimulator((s) => s.status)
   const inspectorTab = useSimulator((s) => s.inspectorTab)
+  const source = useSimulator((s) => s.source)
 
   const trackedUppercase = { letterSpacing: '0.06em' } as const
+
+  const charCount = source.length
+  const lineCount = source === '' ? 0 : source.split('\n').length
 
   return (
     <footer
@@ -33,8 +37,17 @@ export function StatusBar() {
         {statusLabel(status)}
       </span>
 
-      {/* Center: reserved for cycle count + PC on Day 3 */}
-      <span aria-hidden="true" className="border-r border-divider" />
+      {/* Center: live source line + char count. Day 3 replaces this
+         with cycle count + PC. */}
+      <span
+        className="flex items-center gap-1 border-r border-divider px-4"
+        style={trackedUppercase}
+      >
+        <span className="tabular-nums text-ink-2">{charCount}</span>
+        <span className="text-ink-3">chars ·</span>
+        <span className="tabular-nums text-ink-2">{lineCount}</span>
+        <span className="text-ink-3">lines</span>
+      </span>
 
       {/* Right: build version + active inspector tab */}
       <span className="flex items-center gap-2 px-4">
