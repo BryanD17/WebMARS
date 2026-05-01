@@ -57,7 +57,7 @@ export function InspectorPane() {
   return (
     <aside
       aria-label="Inspector"
-      className="flex min-h-0 min-w-0 flex-col border-t border-divider bg-surface-1 lg:border-t-0"
+      className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-divider bg-surface-1 lg:border-t-0"
     >
       <div
         role="tablist"
@@ -103,7 +103,7 @@ export function InspectorPane() {
           id={`inspector-panel-${tab.id}`}
           aria-labelledby={`inspector-tab-${tab.id}`}
           hidden={tab.id !== active}
-          className="flex-1 overflow-auto p-4 animate-[tab-fade-in_100ms_ease-out]"
+          className="min-h-0 flex-1 overflow-y-auto p-4 animate-[tab-fade-in_100ms_ease-out]"
         >
           {tab.id === 'registers' && <RegisterTable />}
           {tab.id === 'memory' && <MemoryEmpty />}

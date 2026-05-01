@@ -58,14 +58,14 @@ export function SourcePane() {
   return (
     <section
       aria-label="Source editor"
-      className="flex min-h-0 min-w-0 flex-col border-divider bg-surface-0 p-px lg:border-r"
+      className="flex min-h-0 min-w-0 flex-col overflow-hidden border-divider bg-surface-0 p-px lg:border-r"
     >
       <label htmlFor="source-editor" className="sr-only">
         MIPS assembly source
       </label>
 
       <div
-        className="flex flex-1 overflow-hidden border border-divider font-mono text-base"
+        className="flex min-h-0 flex-1 overflow-hidden border border-divider font-mono text-base"
         style={{ lineHeight: `${LINE_HEIGHT_PX}px` }}
       >
         {/* Line-number gutter — moves to Monaco config on Day 2.
