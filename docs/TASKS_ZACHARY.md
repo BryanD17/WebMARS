@@ -34,7 +34,7 @@ snapshot(): RegisterSnapshot   // matches src/hooks/types.ts
 `initialRegisters` in `src/hooks/useSimulator.ts` now sets:
 
 - `pc = 0x00400000` (canonical MIPS text base)
-- `gpr.$sp = 0x7FFFFFFC` (canonical MARS stack-top init)
+- `gpr.$sp = 0x7FFFEFFC` (canonical MARS stack-top init)
 
 (Added in SA-6.5.) Your `reset()` must restore those exact values,
 **not zero**. Import the constants from `src/hooks/useSimulator.ts`
@@ -70,7 +70,7 @@ one shape and stick with it for all instructions.
 ```
 step()   executes 1 instruction; advances PC by 4 unless a branch was taken
 run()    loops step() until halt or breakpoint  (breakpoints are Day 4)
-reset()  restores initialRegisters, clears memory, PC = 0x00400000, $sp = 0x7FFFFFFC
+reset()  restores initialRegisters, clears memory, PC = 0x00400000, $sp = 0x7FFFEFFC
 ```
 
 ## Day 3 — Thursday Apr 30
