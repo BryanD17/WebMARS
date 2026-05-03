@@ -1,4 +1,11 @@
-import { useEffect, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import { cn } from './cn.ts'
 
@@ -24,6 +31,42 @@ export function TabStrip() {
 
   const [draggingId, setDraggingId]   = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+
+  function focusTab(id: string): void {
+    const el = tabRefs.current.get(id)
+    if (el) el.focus()
+  }
+
+  function handleTabKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void {
+    if (files.length === 0) return
+    const currentIndex = files.findIndex((f) => f.id === activeFileId)
+    if (currentIndex === -1) return
+
+    let nextIndex: number
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = (currentIndex + 1) % files.length
+        break
+      case 'ArrowLeft':
+        nextIndex = (currentIndex - 1 + files.length) % files.length
+        break
+      case 'Home':
+        nextIndex = 0
+        break
+      case 'End':
+        nextIndex = files.length - 1
+        break
+      default:
+        return
+    }
+
+    event.preventDefault()
+    const next = files[nextIndex]
+    if (!next) return
+    setActive(next.id)
+    focusTab(next.id)
+  }
 
   // Click outside / Escape closes the context menu.
   useEffect(() => {
@@ -79,6 +122,7 @@ export function TabStrip() {
       <div
         role="tablist"
         aria-label="Open files"
+        onKeyDown={handleTabKeyDown}
         className="flex h-9 items-stretch border-b border-divider bg-surface-0 font-mono text-xs"
         style={{ letterSpacing: '0.04em' }}
       >
@@ -107,6 +151,10 @@ export function TabStrip() {
                   aria-selected={selected}
                   tabIndex={selected ? 0 : -1}
                   draggable
+                  ref={(node) => {
+                    if (node) tabRefs.current.set(file.id, node)
+                    else tabRefs.current.delete(file.id)
+                  }}
                   onClick={() => setActive(file.id)}
                   onContextMenu={(event) => handleContextMenu(event, file.id)}
                   onDragStart={(event) => handleDragStart(event, file.id)}
