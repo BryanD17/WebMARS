@@ -494,6 +494,80 @@ export function assemble(source: string): AssembledProgram {
             consumed = 3; break;
           }
           case 'nop': instr = 0; consumed = 0; break;
+
+          // ─ Coprocessor 1 (FPU) ─
+          // The FPU encoding reuses the rType field layout: cop1 op
+          // 0x11, with rs slot = fmt (0x10 for .s, 0x14 for .w),
+          // rt slot = ft, rd slot = fs, shamt slot = fd. So the
+          // assembler positions are: getR(0)→fd, getR(2)→fs,
+          // getR(4)→ft, mirroring how the decoder unpacks them.
+
+          // 3-operand single-precision: op.s $fd, $fs, $ft
+          case 'add.s': instr = rType(0x11, 0x10, getR(4), getR(2), getR(0), 0x00); consumed = 5; break;
+          case 'sub.s': instr = rType(0x11, 0x10, getR(4), getR(2), getR(0), 0x01); consumed = 5; break;
+          case 'mul.s': instr = rType(0x11, 0x10, getR(4), getR(2), getR(0), 0x02); consumed = 5; break;
+          case 'div.s': instr = rType(0x11, 0x10, getR(4), getR(2), getR(0), 0x03); consumed = 5; break;
+
+          // 2-operand single-precision: op.s $fd, $fs (ft slot unused, must be 0)
+          case 'sqrt.s': instr = rType(0x11, 0x10, 0, getR(2), getR(0), 0x04); consumed = 3; break;
+          case 'abs.s':  instr = rType(0x11, 0x10, 0, getR(2), getR(0), 0x05); consumed = 3; break;
+          case 'mov.s':  instr = rType(0x11, 0x10, 0, getR(2), getR(0), 0x06); consumed = 3; break;
+          case 'neg.s':  instr = rType(0x11, 0x10, 0, getR(2), getR(0), 0x07); consumed = 3; break;
+
+          // Conversions — fmt names the SOURCE format. cvt.<dst>.<src>
+          case 'cvt.w.s': instr = rType(0x11, 0x10, 0, getR(2), getR(0), 0x24); consumed = 3; break;
+          case 'cvt.s.w': instr = rType(0x11, 0x14, 0, getR(2), getR(0), 0x20); consumed = 3; break;
+
+          // Compare single-precision: c.cond.s $fs, $ft (sets cc[0]; no fd)
+          case 'c.eq.s': instr = rType(0x11, 0x10, getR(2), getR(0), 0, 0x32); consumed = 3; break;
+          case 'c.lt.s': instr = rType(0x11, 0x10, getR(2), getR(0), 0, 0x3c); consumed = 3; break;
+          case 'c.le.s': instr = rType(0x11, 0x10, getR(2), getR(0), 0, 0x3e); consumed = 3; break;
+
+          // Branch on FP condition flag — sub-op fmt = 0x08; rt = 0
+          // for bc1f (false), 1 for bc1t (true). Branch offset is
+          // computed the same way as integer branches.
+          case 'bc1f': {
+            const labelTok = nextToks[0];
+            const off = labelTok?.type === 'ident' ? getBranchOffset(labelTok.value) : getI(0);
+            instr = iType(0x11, 0x08, 0x00, off); consumed = 1; break;
+          }
+          case 'bc1t': {
+            const labelTok = nextToks[0];
+            const off = labelTok?.type === 'ident' ? getBranchOffset(labelTok.value) : getI(0);
+            instr = iType(0x11, 0x08, 0x01, off); consumed = 1; break;
+          }
+
+          // Move between GPR and FPR. mfc1/mtc1 use the rt field for
+          // the GPR and the fs (rd) field for the FPR.
+          case 'mfc1': instr = rType(0x11, 0x00, getR(0), getR(2), 0, 0x00); consumed = 3; break;
+          case 'mtc1': instr = rType(0x11, 0x04, getR(0), getR(2), 0, 0x00); consumed = 3; break;
+
+          // FP load/store — accept both "lwc1 $ft, off($rs)" and
+          // the imm + base flat form, mirroring the integer lw/sw
+          // parsing convention above.
+          case 'lwc1': {
+            const rt2 = getR(0)
+            const immTok = nextToks[2]
+            let base: number, offset: number
+            if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
+              offset = parseImm(immTok.value)
+              base = getReg(nextToks[4], errors)
+              consumed = 6
+            } else { offset = getI(2); base = getR(4); consumed = 5 }
+            instr = iType(0x31, base, rt2, offset); break
+          }
+          case 'swc1': {
+            const rt2 = getR(0)
+            const immTok = nextToks[2]
+            let base: number, offset: number
+            if (immTok?.type === 'immediate' && nextToks[3]?.type === 'lparen') {
+              offset = parseImm(immTok.value)
+              base = getReg(nextToks[4], errors)
+              consumed = 6
+            } else { offset = getI(2); base = getR(4); consumed = 5 }
+            instr = iType(0x39, base, rt2, offset); break
+          }
+
           default:
             errors.push({ line, message: `Unknown mnemonic: ${mnemonic}` });
         }

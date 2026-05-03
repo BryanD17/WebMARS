@@ -1,4 +1,11 @@
-import { createRegisterFile, toSigned32, toUnsigned32 } from './registers'
+import {
+  createRegisterFile,
+  createFpuRegisterFile,
+  bitsToFloat,
+  floatToBits,
+  toSigned32,
+  toUnsigned32,
+} from './registers'
 import { Memory, TEXT_BASE } from './memory'
 import { handleSyscall, type SyscallIO } from './syscalls'
 import type { AssembledProgram } from './types'
@@ -13,22 +20,31 @@ export class Simulator {
   private halted: boolean = false
   private stepCount: number = 0
   private lastChanged: Set<number> = new Set()
+  // ─ coprocessor 1 (FPU) ─
+  // Single-precision register bits + the FCSR cc[0] bit set by c.cond.s.
+  private fpRegs: number[]
+  private fpCondFlag: boolean = false
+  private lastChangedFp: Set<number> = new Set()
   private io: SyscallIO
 
   constructor(io: SyscallIO) {
     this.regs = createRegisterFile()
+    this.fpRegs = createFpuRegisterFile()
     this.memory = new Memory()
     this.io = io
   }
 
   load(program: AssembledProgram): void {
     this.regs = createRegisterFile()
+    this.fpRegs = createFpuRegisterFile()
+    this.fpCondFlag = false
     this.hi = 0
     this.lo = 0
     this.pc = TEXT_BASE
     this.halted = false
     this.stepCount = 0
     this.lastChanged = new Set()
+    this.lastChangedFp = new Set()
     this.memory = new Memory()
     this.memory.loadProgram(program.instructions, program.dataSegment)
     this.program = program
@@ -49,6 +65,38 @@ export class Simulator {
     }
   }
 
+  // FPU snapshot — separate from getState() so the existing contract
+  // (RegisterSnapshot) doesn't expand. The store reads this only when
+  // the FPU panel is mounted (gated by simSettings.coproc01Panels).
+  getFpuState(): { fpRegisters: number[]; condFlag: boolean; lastChangedFpRegisters: Set<number> } {
+    return {
+      fpRegisters: [...this.fpRegs],
+      condFlag: this.fpCondFlag,
+      lastChangedFpRegisters: new Set(this.lastChangedFp),
+    }
+  }
+
+  // Reinterpret-cast helpers used by the cop1 instruction decoder.
+  // Setting an FP register clears the lastChanged GPR set so the
+  // register table flash works for FPU writes too.
+  private fr(idx: number): number {
+    return this.fpRegs[idx] ?? 0
+  }
+
+  private setFpReg(idx: number, bits: number): void {
+    if (idx < 0 || idx > 31) return
+    this.fpRegs[idx] = bits | 0
+    this.lastChangedFp.add(idx)
+  }
+
+  private fpSingle(idx: number): number {
+    return bitsToFloat(this.fr(idx))
+  }
+
+  private setFpSingle(idx: number, value: number): void {
+    this.setFpReg(idx, floatToBits(value))
+  }
+
   getCurrentLine(): number | null {
     return this.program?.sourceMap.get(this.pc) ?? null
   }
@@ -64,6 +112,7 @@ export class Simulator {
   async step(): Promise<void> {
     if (this.halted) return
     this.lastChanged = new Set()
+    this.lastChangedFp = new Set()
     const instr = this.memory.readWord(this.pc)
     this.pc += 4
     await this.execute(instr)
@@ -165,6 +214,57 @@ export class Simulator {
     } else if (op === 0x03) {
       this.setReg(31, this.pc)
       this.pc = ((this.pc & 0xf0000000) | (target << 2))
+    } else if (op === 0x11) {
+      // ─ coprocessor 1 (FPU) ─
+      // Layout: bits 25:21 = fmt (or sub-op for mtc1/mfc1/bc1),
+      // 20:16 = ft, 15:11 = fs, 10:6 = fd, 5:0 = funct.
+      const fmt = (instr >>> 21) & 0x1f
+      const ft  = (instr >>> 16) & 0x1f
+      const fs  = (instr >>> 11) & 0x1f
+      const fd  = (instr >>> 6)  & 0x1f
+      // bc1 uses imm16s (relative branch in instruction-count units).
+      if (fmt === 0x08) {
+        // BC1F (rt&1==0) / BC1T (rt&1==1). Real MIPS encodes the
+        // condition code in bits 20:18; we only support cc=0.
+        const takeIfTrue = (ft & 0x01) === 1
+        const taken = takeIfTrue ? this.fpCondFlag : !this.fpCondFlag
+        if (taken) this.pc += imm16s * 4 - 4
+      } else if (fmt === 0x00) {
+        // MFC1 — move FP word to GPR. rt = bits of fs as a sign-
+        // extended 32-bit integer.
+        this.setReg(ft, toSigned32(this.fr(fs)))
+      } else if (fmt === 0x04) {
+        // MTC1 — move GPR word to FP. fs ← bits(rt).
+        this.setFpReg(fs, this.r(ft))
+      } else if (fmt === 0x10) {
+        // FMT_S — single-precision arithmetic + comparison.
+        switch (funct) {
+          case 0x00: this.setFpSingle(fd, this.fpSingle(fs) + this.fpSingle(ft)); break  // add.s
+          case 0x01: this.setFpSingle(fd, this.fpSingle(fs) - this.fpSingle(ft)); break  // sub.s
+          case 0x02: this.setFpSingle(fd, this.fpSingle(fs) * this.fpSingle(ft)); break  // mul.s
+          case 0x03: this.setFpSingle(fd, this.fpSingle(fs) / this.fpSingle(ft)); break  // div.s
+          case 0x04: this.setFpSingle(fd, Math.sqrt(this.fpSingle(fs))); break             // sqrt.s
+          case 0x05: this.setFpSingle(fd, Math.abs(this.fpSingle(fs))); break              // abs.s
+          case 0x06: this.setFpReg(fd, this.fr(fs)); break                                  // mov.s
+          case 0x07: this.setFpSingle(fd, -this.fpSingle(fs)); break                        // neg.s
+          case 0x24: this.setFpReg(fd, toSigned32(Math.trunc(this.fpSingle(fs)))); break    // cvt.w.s
+          case 0x32: this.fpCondFlag = this.fpSingle(fs) === this.fpSingle(ft); break       // c.eq.s
+          case 0x3c: this.fpCondFlag = this.fpSingle(fs) <  this.fpSingle(ft); break        // c.lt.s
+          case 0x3e: this.fpCondFlag = this.fpSingle(fs) <= this.fpSingle(ft); break        // c.le.s
+          default:
+            throw new Error(`Unknown cop1 fmt.s funct: 0x${funct.toString(16)}`)
+        }
+      } else if (fmt === 0x14) {
+        // FMT_W — integer-formatted FP register. Only conversion to
+        // single-precision is supported (cvt.s.w).
+        switch (funct) {
+          case 0x20: this.setFpSingle(fd, toSigned32(this.fr(fs))); break  // cvt.s.w
+          default:
+            throw new Error(`Unknown cop1 fmt.w funct: 0x${funct.toString(16)}`)
+        }
+      } else {
+        throw new Error(`Unknown cop1 fmt: 0x${fmt.toString(16)}`)
+      }
     } else {
       switch (op) {
         case 0x08: this.setReg(rt, this.r(rs) + imm16s); break
@@ -183,6 +283,8 @@ export class Simulator {
         case 0x2b: this.memory.writeWord(this.r(rs) + imm16s, this.r(rt)); break
         case 0x29: this.memory.writeHalf(this.r(rs) + imm16s, this.r(rt)); break
         case 0x28: this.memory.writeByte(this.r(rs) + imm16s, this.r(rt)); break
+        case 0x31: this.setFpReg(rt, this.memory.readWord(this.r(rs) + imm16s)); break    // lwc1 — fpr[rt] = MEM[rs+off]
+        case 0x39: this.memory.writeWord(this.r(rs) + imm16s, this.fr(rt)); break          // swc1 — MEM[rs+off] = fpr[rt]
         case 0x04: if (this.r(rs) === this.r(rt)) this.pc += imm16s * 4 - 4; break
         case 0x05: if (this.r(rs) !== this.r(rt)) this.pc += imm16s * 4 - 4; break
         case 0x07: if (toSigned32(this.r(rs)) > 0) this.pc += imm16s * 4 - 4; break
