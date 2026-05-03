@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import { ConsoleEmpty } from './ConsoleEmpty.tsx'
+import { ConsoleInputField } from './ConsoleInputField.tsx'
 import { cn } from './cn.ts'
 
 const MAX_VISIBLE_LINES = 1000
@@ -11,6 +12,11 @@ export function ConsolePanel() {
   const filter       = useSimulator((s) => s.consoleFilter)
   const setFilter    = useSimulator((s) => s.setConsoleFilter)
   const clearConsole = useSimulator((s) => s.clearConsole)
+  const pending      = useSimulator((s) => s.pendingInput)
+  // Pending object reference doubles as the React key — every new
+  // read syscall installs a new pending object, which re-mounts the
+  // input field (resetting its value and re-focusing).
+  const pendingKey   = useSimulator((s) => s.pendingInput?.kind ?? 'idle')
 
   const scrollRef = useRef<HTMLDivElement | null>(null)
   // atBottom drives both effects (auto-scroll on new output) and
@@ -156,6 +162,12 @@ export function ConsolePanel() {
           </div>
         )}
       </div>
+
+      {/* Input field — only renders when the simulator is suspended
+         on a read syscall (pendingInput !== null). Keyed by the
+         pending reference so the field re-mounts (resetting value +
+         re-focusing) every time the engine starts a new read. */}
+      {pending !== null && <ConsoleInputField key={pendingKey} pending={pending} />}
     </div>
   )
 }
