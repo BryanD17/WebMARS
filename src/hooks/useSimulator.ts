@@ -612,6 +612,11 @@ interface SimulatorStoreState {
   setSimSetting: <K extends keyof SimSettings>(key: K, value: SimSettings[K]) => void
   openSettings: () => void
   closeSettings: () => void
+
+  // ─ command palette slice (additive; not persisted — session only) ─
+  commandPaletteOpen: boolean
+  openCommandPalette:  () => void
+  closeCommandPalette: () => void
 }
 
 let _sim: Simulator | null = null
@@ -1035,6 +1040,10 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
 
     openSettings:  () => set({ settingsDialogOpen: true  }),
     closeSettings: () => set({ settingsDialogOpen: false }),
+
+    commandPaletteOpen: false,
+    openCommandPalette:  () => set({ commandPaletteOpen: true  }),
+    closeCommandPalette: () => set({ commandPaletteOpen: false }),
 
     writeMemoryWord: (addr, value) => {
       if (!_sim) return false

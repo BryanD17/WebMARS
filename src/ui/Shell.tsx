@@ -10,6 +10,7 @@ import { SourcePane } from './SourcePane.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { DevPanel } from './DevPanel.tsx'
 import { SettingsDialog } from './SettingsDialog.tsx'
+import { CommandPalette } from './CommandPalette.tsx'
 
 // 5-band command-center layout. Workspace columns and rows expand and
 // collapse based on the layout slice (right panel open / bottom panel
@@ -27,6 +28,20 @@ export function Shell() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
+
+  // Ctrl+Shift+P opens the command palette. Reads via getState() so
+  // the listener doesn't need to re-bind on store changes; the rest
+  // of the keybinding map lands in SA-14.
+  useEffect(() => {
+    function handler(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'p') {
+        event.preventDefault()
+        useSimulator.getState().openCommandPalette()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // Block accidental tab close / reload when any file is modified.
   // Reads state imperatively via getState() so the effect doesn't
@@ -73,6 +88,7 @@ export function Shell() {
       </div>
       {import.meta.env.DEV && <DevPanel />}
       <SettingsDialog />
+      <CommandPalette />
     </>
   )
 }
