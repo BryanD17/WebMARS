@@ -3,6 +3,7 @@ import { Editor, type Monaco, type OnMount } from '@monaco-editor/react'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import { registerMips } from '@/lib/mipsLanguage.ts'
+import { JUMP_TO_LINE_EVENT, type JumpToLineDetail } from '@/lib/jumpToLine.ts'
 
 // Wraps @monaco-editor/react with the WebMARS MIPS language + dark
 // theme + IDE-density editor options. Replaces SourcePane's previous
@@ -58,6 +59,24 @@ export function CodeEditor() {
 
     monaco.editor.setModelMarkers(model, 'webmars-assembler', markers)
   }, [assemblerErrors])
+
+  // Listen for the JUMP_TO_LINE_EVENT dispatched by Problems /
+  // Messages panels — reveal the line, place the cursor at column 1
+  // (or the requested column), and focus the editor so subsequent
+  // keystrokes land in the right place.
+  useEffect(() => {
+    function handler(event: Event) {
+      const detail = (event as CustomEvent<JumpToLineDetail>).detail
+      if (!detail || typeof detail.line !== 'number') return
+      const editor = editorRef.current
+      if (!editor) return
+      editor.revealLineInCenterIfOutsideViewport(detail.line)
+      editor.setPosition({ lineNumber: detail.line, column: detail.column ?? 1 })
+      editor.focus()
+    }
+    window.addEventListener(JUMP_TO_LINE_EVENT, handler)
+    return () => window.removeEventListener(JUMP_TO_LINE_EVENT, handler)
+  }, [])
 
   return (
     <Editor
