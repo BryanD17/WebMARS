@@ -11,6 +11,7 @@ import { StatusBar } from './StatusBar.tsx'
 import { DevPanel } from './DevPanel.tsx'
 import { SettingsDialog } from './SettingsDialog.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
+import { installKeybindings } from '@/lib/keybindings.ts'
 
 // 5-band command-center layout. Workspace columns and rows expand and
 // collapse based on the layout slice (right panel open / bottom panel
@@ -21,6 +22,8 @@ export function Shell() {
   const rightPanelOpen   = useSimulator((s) => s.rightPanelOpen)
   const bottomPanelOpen  = useSimulator((s) => s.bottomPanelOpen)
   const theme            = useSimulator((s) => s.theme)
+  const files            = useSimulator((s) => s.files)
+  const activeFileId     = useSimulator((s) => s.activeFileId)
 
   // Apply theme via documentElement.dataset.theme. tokens.css scopes
   // light + HC overrides under [data-theme="…"] selectors so every
@@ -29,19 +32,25 @@ export function Shell() {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
-  // Ctrl+Shift+P opens the command palette. Reads via getState() so
-  // the listener doesn't need to re-bind on store changes; the rest
-  // of the keybinding map lands in SA-14.
+  // Install the global keybinding map (Ctrl+S, F5, F7, etc.). The
+  // module reads the store via getState() so the listener doesn't
+  // re-bind on store changes; mounted once for the app's lifetime.
   useEffect(() => {
-    function handler(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'p') {
-        event.preventDefault()
-        useSimulator.getState().openCommandPalette()
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    return installKeybindings()
   }, [])
+
+  // Dynamic document title — "● filename — WebMARS" when modified,
+  // "filename — WebMARS" when clean, or "WebMARS" when no file is open.
+  // Mirrors VS Code's titlebar convention.
+  useEffect(() => {
+    const active = files.find((f) => f.id === activeFileId)
+    if (!active) {
+      document.title = 'WebMARS'
+      return
+    }
+    const dot = active.modified ? '● ' : ''
+    document.title = `${dot}${active.name} — WebMARS`
+  }, [files, activeFileId])
 
   // Block accidental tab close / reload when any file is modified.
   // Reads state imperatively via getState() so the effect doesn't
