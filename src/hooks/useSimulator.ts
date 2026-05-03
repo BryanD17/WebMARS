@@ -11,8 +11,14 @@ import type {
   SimStatus,
 } from './types.ts'
 
+// Canonical MIPS / real-MARS conventions: program text starts at
+// 0x00400000 and the stack pointer initializes at 0x7FFFEFFC (top of
+// the user stack segment, just below the kernel-reserved region). The
+// engine's createRegisterFile() in src/core/registers.ts uses the same
+// value, so the pre-Assemble register table and the post-Assemble
+// snapshot agree on $sp without a visible value jump.
 const MIPS_TEXT_BASE = 0x00400000
-const MIPS_STACK_TOP = 0x7ffffffc
+const MIPS_STACK_TOP = 0x7fffeffc
 
 const HELLO_MIPS_SOURCE = `# Welcome to WebMARS.
 # This is a working example. Click Assemble, then Run.
