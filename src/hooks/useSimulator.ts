@@ -3,6 +3,7 @@ import { Simulator } from '../core/simulator.ts'
 import { assemble } from '../core/instructions.ts'
 import { REGISTER_NAMES } from '../core/registers.ts'
 import type { AssembledProgram } from '../core/types.ts'
+import type { Memory } from '../core/memory.ts'
 import type {
   AssemblerError,
   InspectorTab,
@@ -524,6 +525,85 @@ let _stopFlag = false
 // other reason.
 let _tempBreakpoint: number | null = null
 
+// ─ backstep history (commit 3) ─
+//
+// Bounded ring of snapshots, one per executed instruction. Each entry
+// captures the engine state BEFORE the step that produced it, plus
+// the word-level memory writes the step performed (so they can be
+// rewound). Console output is restored by trimming consoleOutput back
+// to its pre-step length — printed text is recorded at word zero, not
+// at character zero, but for our purposes a length-trim is the only
+// recovery mode that matches the user's mental model.
+//
+// Memory writes are captured by monkey-patching writeWord/writeHalf/
+// writeByte on the active Memory instance (a new one is created on
+// every assemble + reset). The patch is idempotent per Memory via a
+// WeakSet. _currentMemWrites points at the in-flight snapshot's
+// write-array so the patched methods know where to record; it's
+// cleared between steps to avoid attributing memory edits made by
+// other code paths (e.g., the inspector's writeMemoryWord).
+interface HistorySnapshot {
+  regs: number[]
+  hi: number
+  lo: number
+  pc: number
+  stepCount: number
+  halted: boolean
+  consoleLen: number
+  memWrites: { alignedAddr: number; prevWord: number }[]
+}
+
+const MAX_HISTORY = 200
+const _history: HistorySnapshot[] = []
+let _currentMemWrites: HistorySnapshot['memWrites'] | null = null
+const _patchedMemories = new WeakSet<Memory>()
+
+function patchMemoryForBackstep(sim: Simulator): void {
+  const mem = (sim as unknown as { memory: Memory }).memory
+  if (_patchedMemories.has(mem)) return
+  const origWriteWord = mem.writeWord.bind(mem)
+  const origWriteHalf = mem.writeHalf.bind(mem)
+  const origWriteByte = mem.writeByte.bind(mem)
+  function record(addr: number): void {
+    if (!_currentMemWrites) return
+    const aligned = (addr & ~0x3) >>> 0
+    for (const w of _currentMemWrites) if (w.alignedAddr === aligned) return
+    try {
+      _currentMemWrites.push({ alignedAddr: aligned, prevWord: mem.readWord(aligned) })
+    } catch {
+      // Unmapped address — the underlying write will throw too; the
+      // step's catch block surfaces it as a runtime error.
+    }
+  }
+  mem.writeWord = (addr, val) => { record(addr); origWriteWord(addr, val) }
+  mem.writeHalf = (addr, val) => { record(addr); origWriteHalf(addr, val) }
+  mem.writeByte = (addr, val) => { record(addr); origWriteByte(addr, val) }
+  _patchedMemories.add(mem)
+}
+
+function pushHistorySnapshot(sim: Simulator, consoleLen: number): HistorySnapshot {
+  const engineState = sim.getState()
+  const snap: HistorySnapshot = {
+    regs: [...engineState.registers],
+    hi: engineState.hi,
+    lo: engineState.lo,
+    pc: engineState.pc,
+    stepCount: engineState.stepCount,
+    halted: sim.isHalted(),
+    consoleLen,
+    memWrites: [],
+  }
+  _history.push(snap)
+  if (_history.length > MAX_HISTORY) _history.shift()
+  _currentMemWrites = snap.memWrites
+  return snap
+}
+
+function clearHistory(): void {
+  _history.length = 0
+  _currentMemWrites = null
+}
+
 export const useSimulator = create<SimulatorStoreState>((set, get) => {
   function makeSim(): Simulator {
     if (_sim) return _sim
@@ -785,13 +865,54 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     },
 
     backstep: () => {
-      // Implemented in commit 3.
+      const s = get()
+      if (s.pendingInput !== null) return
+      if (s.status !== 'paused' && s.status !== 'ready' && s.status !== 'halted') return
+      if (!_sim) return
+      const snap = _history.pop()
+      if (!snap) return
+      const sim = _sim
+      const memHolder = sim as unknown as {
+        regs: number[]; hi: number; lo: number; pc: number;
+        halted: boolean; stepCount: number; lastChanged: Set<number>;
+        memory: Memory;
+      }
+      // Undo memory writes in reverse — sub-word writes were captured
+      // at word granularity, so a single restore per aligned word is
+      // both necessary and sufficient.
+      for (let i = snap.memWrites.length - 1; i >= 0; i--) {
+        const entry = snap.memWrites[i]
+        if (!entry) continue
+        try {
+          memHolder.memory.writeWord(entry.alignedAddr, entry.prevWord)
+        } catch {
+          // The post-step memory layout should still hold the same
+          // mapping that recorded the pre-step value, so this branch
+          // shouldn't fire — guard anyway.
+        }
+      }
+      memHolder.regs = [...snap.regs]
+      memHolder.hi = snap.hi
+      memHolder.lo = snap.lo
+      memHolder.pc = snap.pc
+      memHolder.halted = snap.halted
+      memHolder.stepCount = snap.stepCount
+      memHolder.lastChanged = new Set()
+      // Trim console output back to its pre-step length. Side effects
+      // like syscall exits aren't fully reversible — `halted` and
+      // `pc` cover the simulator-visible part; the toolbar's status
+      // pill flips back to 'paused' so the user sees they can step
+      // forward again.
+      const engineState = sim.getState()
+      set((curr) => ({
+        status: 'paused',
+        registers: buildSnapshot(engineState, curr.registers),
+        consoleOutput: curr.consoleOutput.slice(0, snap.consoleLen),
+      }))
+      get().refreshMemorySnapshot()
     },
 
-    canBackstep: () => {
-      // Implemented in commit 3.
-      return false
-    },
+    canBackstep: () => _history.length > 0,
 
     writeMemoryWord: (addr, value) => {
       if (!_sim) return false
@@ -1060,8 +1181,10 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       }
       _sim = null
       _stopFlag = false
+      clearHistory()
       const sim = makeSim()
       sim.load(program)
+      patchMemoryForBackstep(sim)
       const engineState = sim.getState()
       set({
         status: 'ready',
@@ -1079,10 +1202,13 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const { status, registers: prevRegisters } = get()
       if (status !== 'ready' && status !== 'paused') return
       const sim = makeSim()
+      patchMemoryForBackstep(sim)
       void (async () => {
         try {
           set({ status: 'running' })
+          pushHistorySnapshot(sim, get().consoleOutput.length)
           await sim.step()
+          _currentMemWrites = null
           const engineState = sim.getState()
           set({
             status: sim.isHalted() ? 'halted' : 'paused',
@@ -1090,6 +1216,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           })
           get().refreshMemorySnapshot()
         } catch (e: unknown) {
+          _currentMemWrites = null
           const message = e instanceof Error ? e.message : String(e)
           set({
             status: 'error',
@@ -1103,6 +1230,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const { status } = get()
       if (status !== 'ready' && status !== 'paused') return
       const sim = makeSim()
+      patchMemoryForBackstep(sim)
       _stopFlag = false
       set({ status: 'running' })
       void (async () => {
@@ -1139,7 +1267,9 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
               await new Promise<void>((r) => setTimeout(r, 1000 / runSpeed))
             }
             const prevRegisters = get().registers
+            pushHistorySnapshot(sim, get().consoleOutput.length)
             await sim.step()
+            _currentMemWrites = null
             if (runSpeed === 0 && i % 500 === 0) {
               const engineState = sim.getState()
               set({ registers: buildSnapshot(engineState, prevRegisters) })
@@ -1162,6 +1292,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           })
           get().refreshMemorySnapshot()
         } catch (e: unknown) {
+          _currentMemWrites = null
           const message = e instanceof Error ? e.message : String(e)
           set({
             status: 'error',
@@ -1174,8 +1305,12 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     reset: () => {
       _stopFlag = true
       _tempBreakpoint = null
+      clearHistory()
       const sim = _sim
-      if (sim) sim.reset()
+      if (sim) {
+        sim.reset()
+        patchMemoryForBackstep(sim)
+      }
       const engineState = sim?.getState()
       set({
         status: sim ? 'ready' : 'idle',

@@ -190,6 +190,13 @@ export function Toolbar() {
   const reset         = useSimulator((s) => s.reset)
   const pause         = useSimulator((s) => s.pause)
   const runToCursor   = useSimulator((s) => s.runToCursor)
+  const backstep      = useSimulator((s) => s.backstep)
+  // canBackstep is a getter (not a slice value), so subscribing to
+  // status keeps the disabled flag fresh — every step / run / reset
+  // changes status and triggers re-render.
+  const _statusForBackstep = useSimulator((s) => s.status)
+  void _statusForBackstep
+  const canBackstep   = useSimulator.getState().canBackstep()
   const newFile       = useSimulator((s) => s.newFile)
   const openFromDisk  = useSimulator((s) => s.openFromDisk)
   const saveActive    = useSimulator((s) => s.saveActive)
@@ -276,7 +283,16 @@ export function Toolbar() {
         >
           Step
         </Button>
-        <PlaceholderButton label="Backstep"     title="Backstep (Shift+F7) — wired in SA-10 commit 3" />
+        <Button
+          variant="ghost"
+          disabled={!canBackstep || (status !== 'paused' && status !== 'ready' && status !== 'halted')}
+          aria-disabled={!canBackstep || (status !== 'paused' && status !== 'ready' && status !== 'halted')}
+          onClick={backstep}
+          title="Step backward — restores the prior register/memory snapshot (Shift+F7 — keybinding wires in SA-14)"
+          className="px-2 py-1 text-xs"
+        >
+          Backstep
+        </Button>
         <Button
           variant="ghost"
           disabled={noSource || (status !== 'ready' && status !== 'paused')}
