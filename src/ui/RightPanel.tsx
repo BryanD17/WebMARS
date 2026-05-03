@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { cn } from './cn.ts'
 import { RegisterTable } from './RegisterTable.tsx'
-import { MemoryEmpty } from './MemoryEmpty.tsx'
+import { MemoryPanel } from './MemoryPanel.tsx'
 
 interface AccordionSectionProps {
   title: string
@@ -84,8 +84,8 @@ export function RightPanel() {
         <RegisterTable />
       </AccordionSection>
 
-      <AccordionSection title="Memory" futureSubAgent="SA-8">
-        <MemoryEmpty />
+      <AccordionSection title="Memory" defaultOpen={false}>
+        <MemoryPanel />
       </AccordionSection>
 
       <AccordionSection title="Watches" futureSubAgent="SA-11">

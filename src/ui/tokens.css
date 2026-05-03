@@ -61,6 +61,14 @@
   to   { opacity: 1; }
 }
 
+/* Memory cell flash on write — 600ms ease-out from --accent to
+   transparent, used by MemoryPanel to highlight cells whose word
+   value changed in the most recent step. */
+@keyframes flash-cell {
+  0%   { background-color: var(--accent); color: var(--surface-0); }
+  100% { background-color: transparent;   color: inherit; }
+}
+
 /* ─ scrollbars ─────────────────────────────────────────────────────
    Style every scrollable surface with the same thin --surface-3 thumb
    on a transparent track so register tables, tab bodies, and the
