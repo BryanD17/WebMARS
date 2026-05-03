@@ -8,7 +8,7 @@ The project is built in TypeScript with React, Vite, and Tailwind CSS, and runs 
 
 ## Status
 
-Active development. Targeting v1.0 for the end of the two-week project window.
+v1.0 ready. Every PRD must-have and stretch goal shipped; 103 tests passing; full MARS feature parity for the curriculum we target.
 
 See [the PRD](./docs/PRD.md) for the full scope, timeline, and roadmap.
 
@@ -18,23 +18,26 @@ The v1.0 release targets the workflows students rely on most.
 
 ### Core
 
-- Source editor with MIPS syntax highlighting (Monaco).
-- Two-pass MIPS32 assembler covering roughly forty instructions, including arithmetic, logical, branch, jump, and load/store operations.
-- Pseudo-instruction support for `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`, and others.
-- Instruction-set simulator with a full 32-register file, HI/LO registers, program counter, and a configurable text/data/stack memory layout.
-- Step, Run, Reset, and Stop controls.
-- Live register file panel with change highlighting.
-- Memory inspector with hex and ASCII views.
-- Console panel supporting the standard MARS syscalls: `print_int` (1), `print_string` (4), `read_int` (5), `read_string` (8), and `exit` (10).
-- Clear assembly and runtime error messages with line numbers.
-
-### Planned
-
-- Inline error highlighting in the editor.
-- Dark mode with persisted preference.
-- Click-to-set breakpoints in the editor gutter.
-- Save and load source files from the local machine.
-- A small library of canonical example programs.
+- Source editor with MIPS syntax highlighting and hover docs (Monaco).
+- Inline assembler-error squiggles plus an error overview ruler in the editor margin.
+- Two-pass MIPS32 assembler covering roughly fifty instructions across arithmetic, logical, branch, jump, load/store, FPU, and trap families.
+- Pseudo-instruction support for `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`, `neg`, `not`, `nop`.
+- Instruction-set simulator with a full 32-register integer file, 32-register single-precision FPU, HI/LO, FCSR cc[0], program counter, and a configurable text/data/stack memory layout.
+- Run, Pause, Step, Backstep (snapshot history with memory-write rewind), Run-to-cursor, Reset controls plus a 1–500 instr/s speed slider.
+- Live register file with per-step change highlighting; toggleable hex / decimal / binary views.
+- Toggleable FPU panel showing $f0–$f31 in float and bits.
+- Memory inspector with segment toggle (`.text` / `.data` / stack), base-address jump, edit-in-place, and a flash on each write.
+- Click-to-set breakpoints in the editor gutter, persisted per file.
+- Bottom panel: Console, Messages, Problems. Console handles syscall I/O via an inline input field; Problems aggregates assembler + runtime errors with click-to-jump.
+- File system: multi-file tabs (drag to reorder), File System Access API integration for native open/save with a download fallback in non-Chromium browsers, Open Recent submenu.
+- Bundled example programs covering array sum, factorial, string print, sum 1..N, syscall I/O, and FPU floating-point math.
+- Symbol table panel resolving labels to addresses with click-to-jump.
+- Searchable instruction reference panel.
+- Settings dialog: dark / light / high-contrast themes, editor font size, simulator toggles (FPU panel, delayed branching, self-modifying code).
+- Command palette (`Ctrl+Shift+P`) with fuzzy search across every action.
+- Keyboard shortcuts (F3/F5/F6/F7/Shift+F7/F8/F9, Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+B, Ctrl+J, Ctrl+,, …).
+- Tools menu featuring an Instruction Counter (static mnemonic histogram + runtime step count).
+- Mobile-friendly read-only mode under 768px viewport.
 
 ## Getting Started
 
@@ -151,10 +154,10 @@ The dependency direction is enforced: `ui/` imports from `core/`, never the reve
 
 | Layer | Technology |
 | --- | --- |
-| Framework | React 18 with TypeScript |
-| Build tool | Vite |
-| Styling | Tailwind CSS |
-| Editor | Monaco Editor (`@monaco-editor/react`) |
+| Framework | React 19 with TypeScript 6 (strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`) |
+| Build tool | Vite 8 |
+| Styling | Tailwind CSS v4 (via `@tailwindcss/vite`), CSS custom properties for theme tokens |
+| Editor | Monaco Editor (`@monaco-editor/react`) with a custom MIPS Monarch grammar |
 | State | Zustand |
 | Testing | Vitest |
 | CI | GitHub Actions |
@@ -178,27 +181,33 @@ Cross-checking simulator output against the original MARS for the same input is 
 
 ## Supported Instruction Set
 
-The instruction list below defines the v1.0 target. Anything outside this list is considered a stretch feature.
+**Arithmetic and logical:** `add`, `addu`, `sub`, `subu`, `addi`, `addiu`, `and`, `or`, `xor`, `nor`, `andi`, `ori`, `xori`, `sll`, `srl`, `sra`, `sllv`, `srlv`, `srav`, `slt`, `slti`, `sltu`, `sltiu`, `mult`, `multu`, `div`, `divu`, `mfhi`, `mflo`, `mthi`, `mtlo`, `lui`.
 
-**Arithmetic and logical:** `add`, `addu`, `sub`, `subu`, `addi`, `addiu`, `and`, `or`, `xor`, `nor`, `andi`, `ori`, `xori`, `sll`, `srl`, `sra`, `slt`, `slti`, `sltu`, `mult`, `div`, `mfhi`, `mflo`.
-
-**Memory:** `lw`, `sw`, `lb`, `sb`, `lh`, `sh`, `lui`.
+**Memory:** `lw`, `sw`, `lh`, `lhu`, `sh`, `lb`, `lbu`, `sb`.
 
 **Branch and jump:** `beq`, `bne`, `bgtz`, `bltz`, `blez`, `bgez`, `j`, `jal`, `jr`, `jalr`.
 
-**Pseudo-instructions:** `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`, `neg`, `not`.
+**Trap (Phase 2F):** `teq`, `tne`, `tlt`, `tltu`, `tge`, `tgeu`. Each raises a runtime error when its condition holds.
 
-**Syscalls:** `1` (print_int), `4` (print_string), `5` (read_int), `8` (read_string), `10` (exit).
+**FPU — coprocessor 1, single-precision (Phase 2B):** `add.s`, `sub.s`, `mul.s`, `div.s`, `sqrt.s`, `abs.s`, `mov.s`, `neg.s`, `cvt.s.w`, `cvt.w.s`, `c.eq.s`, `c.lt.s`, `c.le.s`, `bc1f`, `bc1t`, `mtc1`, `mfc1`, `lwc1`, `swc1`. The FPU panel in the right inspector is gated behind a settings toggle.
+
+**Pseudo-instructions:** `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`, `neg`, `not`, `nop`.
+
+**Syscalls:** `1` (print int), `4` (print string), `5` (read int), `8` (read string), `10` (exit), `11` (print char), `12` (read char), `30` (system time), `32` (sleep), `41` (random int), `42` (random int range), `50` (confirm dialog), `51` (input int dialog), `53` (input string dialog), `54` (message dialog).
 
 ## Limitations
 
 WebMARS is intentionally scoped. The following are known limitations of v1.0 and are not bugs.
 
-- No support for the MARS Tools menu (bitmap display, keyboard simulator, cache simulator, etc.).
-- No multi-file projects, no `.include`, no macros.
-- No floating-point register file or floating-point instructions in v1.0.
-- No persistence beyond `localStorage` for editor preferences. Source code is not auto-saved.
-- The simulator does not model branch delay slots or pipeline timing. Instruction execution is sequential and atomic.
+- The MARS Tools menu (bitmap display, keyboard / MMIO simulator, cache simulator, memory reference visualization) is not implemented. Only the Instruction Counter from that menu ships.
+- No `.include` or macros, and no multi-file projects in the assembler sense — multi-file is editor-only.
+- FPU support is single-precision only. Double-precision (`.d` ops) and coprocessor 0 (`$status`, `$cause`, `$epc`, `mfc0`/`mtc0`/`eret`) are out of scope.
+- Branch-delay-slot semantics are off by default for teaching clarity. Real-MIPS delay-slot behavior can be opted into via Settings → Simulator → "Delayed branching"; when on, `jal`/`jalr` save PC+8 to skip the delay slot.
+- Self-modifying code is rejected by default (any store into the `.text` segment throws). Settings → Simulator → "Self-modifying code allowed" lifts the guard.
+- Pipeline timing, hazards, forwarding, and cache effects are not modeled. Instruction execution is sequential and atomic.
+- The `Confirm` dialog syscall (50) collapses MARS's three-state response (Yes / No / Cancel) to two states (OK → Yes, Cancel → No) because it uses the native `window.confirm`.
+- Browser persistence is `localStorage`-only — layout, theme, recent files, breakpoints, and run speed survive a reload, but source code itself is not auto-saved. Use File → Save (or `Ctrl+S`) before closing the tab.
+- The File System Access API used for native Open / Save is Chromium-only. Firefox falls back to `<input type="file">` and a blob download.
 
 ## Contributing
 
