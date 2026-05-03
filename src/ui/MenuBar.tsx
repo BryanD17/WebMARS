@@ -48,6 +48,7 @@ function buildMenus(actions: {
   recentFiles: ReadonlyArray<RecentFile>
   openSettings: () => void
   setTheme: (next: ThemeName) => void
+  openInstructionCounter: () => void
 }): ReadonlyArray<MenuDef> {
   // Build the File menu's "Open Recent" section dynamically from the
   // store's recentFiles array. Each entry is a menuitem labeled with
@@ -124,7 +125,7 @@ function buildMenus(actions: {
   {
     label: 'Tools',
     items: [
-      { kind: 'action', label: 'Instruction Counter',                       disabled: true },
+      { kind: 'action', label: 'Instruction Counter', onClick: actions.openInstructionCounter },
       { kind: 'separator' },
       { kind: 'action', label: 'Cache Simulator (Phase 3)',                 disabled: true },
       { kind: 'action', label: 'Memory Reference Visualization (Phase 3)',  disabled: true },
@@ -170,6 +171,7 @@ export function MenuBar() {
   const recentFiles       = useSimulator((s) => s.recentFiles)
   const openSettings      = useSimulator((s) => s.openSettings)
   const setTheme          = useSimulator((s) => s.setTheme)
+  const openTool          = useSimulator((s) => s.openTool)
 
   const closeActive = async (): Promise<void> => {
     if (activeFileId !== null) await closeFile(activeFileId)
@@ -191,13 +193,14 @@ export function MenuBar() {
         recentFiles,
         openSettings,
         setTheme,
+        openInstructionCounter: () => openTool('instructionCounter'),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       toggleLeftRail, toggleRightPanel, toggleBottomPanel,
       newFile, openFromDisk, saveActive, saveActiveAs, saveAll,
       activeFileId, closeFile, closeAll, recentFiles,
-      openSettings, setTheme,
+      openSettings, setTheme, openTool,
     ],
   )
 

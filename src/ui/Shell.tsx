@@ -11,6 +11,7 @@ import { StatusBar } from './StatusBar.tsx'
 import { DevPanel } from './DevPanel.tsx'
 import { SettingsDialog } from './SettingsDialog.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
+import { InstructionCounter } from './InstructionCounter.tsx'
 import { installKeybindings } from '@/lib/keybindings.ts'
 
 // 5-band command-center layout. Workspace columns and rows expand and
@@ -98,6 +99,7 @@ export function Shell() {
       {import.meta.env.DEV && <DevPanel />}
       <SettingsDialog />
       <CommandPalette />
+      <InstructionCounter />
     </>
   )
 }

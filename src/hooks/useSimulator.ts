@@ -617,6 +617,15 @@ interface SimulatorStoreState {
   commandPaletteOpen: boolean
   openCommandPalette:  () => void
   closeCommandPalette: () => void
+
+  // ─ tools slice (additive; not persisted) ─
+  // Engine-side stepCount mirror so panels can subscribe via Zustand
+  // without poking _sim. Updated alongside registers in step() and
+  // run(); reset to 0 by reset() / assemble().
+  instructionsExecuted: number
+  toolsDialog: 'instructionCounter' | null
+  openTool:  (which: 'instructionCounter') => void
+  closeTool: () => void
 }
 
 let _sim: Simulator | null = null
@@ -1045,6 +1054,11 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     openCommandPalette:  () => set({ commandPaletteOpen: true  }),
     closeCommandPalette: () => set({ commandPaletteOpen: false }),
 
+    instructionsExecuted: 0,
+    toolsDialog: null,
+    openTool:  (which) => set({ toolsDialog: which }),
+    closeTool: ()      => set({ toolsDialog: null  }),
+
     writeMemoryWord: (addr, value) => {
       if (!_sim) return false
       const aligned = (addr & ~0x3) >>> 0
@@ -1324,6 +1338,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         consoleOutput: [],
         assemblerErrors: [],
         runtimeError: null,
+        instructionsExecuted: 0,
       })
       get().logMessage('info', `Assembled successfully: ${program.instructions.length} instructions.`)
       get().refreshMemorySnapshot()
@@ -1344,6 +1359,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           set({
             status: sim.isHalted() ? 'halted' : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
+            instructionsExecuted: engineState.stepCount,
           })
           get().refreshMemorySnapshot()
         } catch (e: unknown) {
@@ -1420,6 +1436,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
               : (_stopFlag || hitBreakpoint) ? 'paused'
               : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
+            instructionsExecuted: engineState.stepCount,
           })
           get().refreshMemorySnapshot()
         } catch (e: unknown) {
@@ -1456,6 +1473,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         // resolves (the simulator was reset out from under it); GC
         // collects when references drop.
         pendingInput: null,
+        instructionsExecuted: 0,
       })
       _stopFlag = false
     },

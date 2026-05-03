@@ -12,7 +12,7 @@ import { useSimulator, type ExampleName } from '@/hooks/useSimulator.ts'
 export interface Command {
   id: string
   label: string
-  group: 'File' | 'Edit' | 'View' | 'Run' | 'Examples' | 'Settings' | 'Help'
+  group: 'File' | 'Edit' | 'View' | 'Run' | 'Examples' | 'Settings' | 'Tools' | 'Help'
   shortcut?: string
   run: () => void
   disabled?: boolean
@@ -86,6 +86,11 @@ export function buildCommands(): Command[] {
     { id: 'settings.themeDark',  label: 'Theme · Dark',           group: 'Settings', run: () => s.setTheme('dark')  },
     { id: 'settings.themeLight', label: 'Theme · Light',          group: 'Settings', run: () => s.setTheme('light') },
     { id: 'settings.themeHC',    label: 'Theme · High Contrast',  group: 'Settings', run: () => s.setTheme('hc')    },
+  )
+
+  // ─ Tools ─
+  out.push(
+    { id: 'tools.instructionCounter', label: 'Instruction Counter', group: 'Tools', run: () => s.openTool('instructionCounter') },
   )
 
   return out
