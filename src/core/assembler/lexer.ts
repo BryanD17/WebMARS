@@ -90,7 +90,7 @@ export function lex(source: string): LexResult {
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const lineNum = lineIdx + 1;
-    let remaining = lines[lineIdx];
+    let remaining = lines[lineIdx] ?? "";
     let col = 1;
 
     while (remaining.length > 0) {
@@ -216,8 +216,8 @@ export function lex(source: string): LexResult {
       }
 
       // Unrecognized character
-      errors.push({ line: lineNum, col, message: `Unexpected character: '${remaining[0]}'` });
-      tokens.push({ type: "UNKNOWN", value: remaining[0], line: lineNum, col });
+      errors.push({ line: lineNum, col, message: `Unexpected character: '${remaining[0] ?? ""}'` });
+      tokens.push({ type: "UNKNOWN", value: remaining[0] ?? "", line: lineNum, col });
       col++;
       remaining = remaining.slice(1);
     }
