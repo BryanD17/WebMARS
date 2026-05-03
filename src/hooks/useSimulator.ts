@@ -1058,6 +1058,12 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const next = { ...get().simSettings, [key]: value }
       set({ simSettings: next })
       writePersistedSimSettings(next)
+      // Phase 2C — propagate delayedBranching to the live simulator
+      // so the change takes effect mid-program. The flag is also
+      // re-applied at assemble time so a fresh sim picks it up.
+      if (key === 'delayedBranching' && _sim) {
+        _sim.setDelayedBranching(value as boolean)
+      }
     },
 
     openSettings:  () => set({ settingsDialogOpen: true  }),
@@ -1348,6 +1354,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       clearHistory()
       const sim = makeSim()
       sim.load(program)
+      sim.setDelayedBranching(get().simSettings.delayedBranching)
       patchMemoryForBackstep(sim)
       const engineState = sim.getState()
       const fpuState = sim.getFpuState()

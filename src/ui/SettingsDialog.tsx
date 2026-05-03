@@ -252,11 +252,9 @@ export function SettingsDialog() {
                 <Section title="Simulator behaviour">
                   <Toggle
                     label="Delayed branching"
-                    description="Execute the instruction immediately after a branch (real-MIPS branch-delay slot)."
+                    description="Execute the instruction immediately after a branch (real-MIPS branch-delay slot). Most course material assumes this is OFF."
                     checked={simSettings.delayedBranching}
                     onChange={(v) => setSimSetting('delayedBranching', v)}
-                    badge="Phase 2C"
-                    disabled
                   />
                   <Toggle
                     label="FPU ($f0–$f31) panel"
