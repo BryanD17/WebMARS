@@ -25,6 +25,7 @@ import factorialSource   from '../examples/factorial.asm?raw'
 import stringPrintSource from '../examples/stringPrint.asm?raw'
 import sumToNSource      from '../examples/sumToN.asm?raw'
 import syscallIOSource   from '../examples/syscallIO.asm?raw'
+import floatMathSource   from '../examples/floatMath.asm?raw'
 
 // Canonical MIPS / real-MARS conventions: program text starts at
 // 0x00400000 and the stack pointer initializes at 0x7FFFEFFC (top of
@@ -211,7 +212,7 @@ function computeInitialLayout(): PersistedLayout {
 // keep reading from one place.
 
 export type ExampleName =
-  | 'arraySum' | 'factorial' | 'stringPrint' | 'sumToN' | 'syscallIO'
+  | 'arraySum' | 'factorial' | 'stringPrint' | 'sumToN' | 'syscallIO' | 'floatMath'
 
 export interface FileEntry {
   id: string
@@ -232,6 +233,7 @@ const EXAMPLE_SOURCES: Record<ExampleName, string> = {
   stringPrint: stringPrintSource,
   sumToN:      sumToNSource,
   syscallIO:   syscallIOSource,
+  floatMath:   floatMathSource,
 }
 
 const RECENT_FILES_KEY = 'webmars:recent-files'

@@ -51,6 +51,7 @@ const EXAMPLES: ReadonlyArray<{ id: ExampleName; label: string; desc: string }> 
   { id: 'stringPrint', label: 'String Print',      desc: 'print a literal via syscall 4' },
   { id: 'sumToN',      label: 'Sum 1..N',          desc: 'read N, print 1+2+…+N' },
   { id: 'syscallIO',   label: 'Syscall I/O',       desc: 'read int, print int (full I/O)' },
+  { id: 'floatMath',   label: 'Float Math (FPU)',  desc: 'sqrt(3² + 4²) via mtc1/cvt.s.w/mul.s' },
 ]
 
 function ExamplesDropdown() {
