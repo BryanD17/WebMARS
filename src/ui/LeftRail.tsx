@@ -1,5 +1,7 @@
 import { useSimulator, type LeftPanelKey } from '@/hooks/useSimulator.ts'
 import { BreakpointsPanel } from './BreakpointsPanel.tsx'
+import { SymbolsPanel } from './SymbolsPanel.tsx'
+import { ReferencePanel } from './ReferencePanel.tsx'
 import { cn } from './cn.ts'
 
 interface RailIcon {
@@ -11,9 +13,9 @@ interface RailIcon {
 
 const RAIL_ICONS: ReadonlyArray<RailIcon> = [
   { id: 'project',     label: 'Project',          glyph: '◧', futureSubAgent: 'SA-2 (file system)' },
-  { id: 'symbols',     label: 'Symbols',          glyph: '⌗', futureSubAgent: 'SA-11' },
+  { id: 'symbols',     label: 'Symbols',          glyph: '⌗' },
   { id: 'breakpoints', label: 'Breakpoints',      glyph: '●' },
-  { id: 'reference',   label: 'Reference',        glyph: '?', futureSubAgent: 'SA-11' },
+  { id: 'reference',   label: 'Reference',        glyph: '?' },
   { id: 'tools',       label: 'Tools',            glyph: '⚙', futureSubAgent: 'SA-15' },
 ]
 
@@ -96,6 +98,10 @@ export function LeftRail() {
         >
           {panelKey === 'breakpoints' ? (
             <BreakpointsPanel />
+          ) : panelKey === 'symbols' ? (
+            <SymbolsPanel />
+          ) : panelKey === 'reference' ? (
+            <ReferencePanel />
           ) : (
             <div className="px-3 py-3 text-xs italic text-ink-3">
               ({panelKey} panel lands in a later sub-agent)
