@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
+import { useSimulator } from '@/hooks/useSimulator.ts'
 import { cn } from './cn.ts'
 import { RegisterTable } from './RegisterTable.tsx'
+import { FpuRegisterTable } from './FpuRegisterTable.tsx'
 import { MemoryPanel } from './MemoryPanel.tsx'
 
 interface AccordionSectionProps {
@@ -75,6 +77,12 @@ function PlaceholderBody({ futureSubAgent, description }: { futureSubAgent: stri
 }
 
 export function RightPanel() {
+  // FPU section is gated by simSettings.coproc01Panels (the toggle
+  // landed in SA-12, wired in Phase 2B). Off-by-default — most
+  // programs don't touch the FPU and the extra accordion eats real
+  // estate in the right pane.
+  const showFpu = useSimulator((s) => s.simSettings.coproc01Panels)
+
   return (
     <aside
       aria-label="Inspector panel"
@@ -83,6 +91,12 @@ export function RightPanel() {
       <AccordionSection title="Registers" defaultOpen>
         <RegisterTable />
       </AccordionSection>
+
+      {showFpu && (
+        <AccordionSection title="FPU ($f0..$f31)" defaultOpen={false}>
+          <FpuRegisterTable />
+        </AccordionSection>
+      )}
 
       <AccordionSection title="Memory" defaultOpen={false}>
         <MemoryPanel />

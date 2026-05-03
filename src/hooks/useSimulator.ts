@@ -626,6 +626,17 @@ interface SimulatorStoreState {
   toolsDialog: 'instructionCounter' | null
   openTool:  (which: 'instructionCounter') => void
   closeTool: () => void
+
+  // ─ FPU snapshot slice (Phase 2B; not persisted) ─
+  // Mirrors Simulator.getFpuState(). The 32-element values array
+  // holds raw 32-bit words; consumers reinterpret as float32 via
+  // bitsToFloat() from src/core/registers.ts. fpChanged drives the
+  // flash animation, mirroring the GPR snapshot's changed Set.
+  fpRegisters: {
+    values: number[]
+    condFlag: boolean
+    changed: ReadonlySet<number>
+  }
 }
 
 let _sim: Simulator | null = null
@@ -1059,6 +1070,12 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     openTool:  (which) => set({ toolsDialog: which }),
     closeTool: ()      => set({ toolsDialog: null  }),
 
+    fpRegisters: {
+      values: new Array<number>(32).fill(0),
+      condFlag: false,
+      changed: new Set<number>(),
+    },
+
     writeMemoryWord: (addr, value) => {
       if (!_sim) return false
       const aligned = (addr & ~0x3) >>> 0
@@ -1331,6 +1348,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       sim.load(program)
       patchMemoryForBackstep(sim)
       const engineState = sim.getState()
+      const fpuState = sim.getFpuState()
       set({
         status: 'ready',
         program,
@@ -1339,6 +1357,11 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         assemblerErrors: [],
         runtimeError: null,
         instructionsExecuted: 0,
+        fpRegisters: {
+          values: fpuState.fpRegisters,
+          condFlag: fpuState.condFlag,
+          changed: fpuState.lastChangedFpRegisters,
+        },
       })
       get().logMessage('info', `Assembled successfully: ${program.instructions.length} instructions.`)
       get().refreshMemorySnapshot()
@@ -1356,10 +1379,16 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           await sim.step()
           _currentMemWrites = null
           const engineState = sim.getState()
+          const fpuState = sim.getFpuState()
           set({
             status: sim.isHalted() ? 'halted' : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
             instructionsExecuted: engineState.stepCount,
+            fpRegisters: {
+              values: fpuState.fpRegisters,
+              condFlag: fpuState.condFlag,
+              changed: fpuState.lastChangedFpRegisters,
+            },
           })
           get().refreshMemorySnapshot()
         } catch (e: unknown) {
@@ -1429,6 +1458,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
             }
           }
           const engineState = sim.getState()
+          const fpuState = sim.getFpuState()
           const prevRegisters = get().registers
           set({
             status:
@@ -1437,6 +1467,11 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
               : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
             instructionsExecuted: engineState.stepCount,
+            fpRegisters: {
+              values: fpuState.fpRegisters,
+              condFlag: fpuState.condFlag,
+              changed: fpuState.lastChangedFpRegisters,
+            },
           })
           get().refreshMemorySnapshot()
         } catch (e: unknown) {
@@ -1460,6 +1495,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         patchMemoryForBackstep(sim)
       }
       const engineState = sim?.getState()
+      const fpuState = sim?.getFpuState()
       set({
         status: sim ? 'ready' : 'idle',
         registers: engineState
@@ -1474,6 +1510,9 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         // collects when references drop.
         pendingInput: null,
         instructionsExecuted: 0,
+        fpRegisters: fpuState
+          ? { values: fpuState.fpRegisters, condFlag: fpuState.condFlag, changed: fpuState.lastChangedFpRegisters }
+          : { values: new Array<number>(32).fill(0), condFlag: false, changed: new Set<number>() },
       })
       _stopFlag = false
     },

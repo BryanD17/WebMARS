@@ -259,12 +259,10 @@ export function SettingsDialog() {
                     disabled
                   />
                   <Toggle
-                    label="Coprocessor 0 / 1 panels"
-                    description="Show $f0–$f31 (FPU) and CP0 status / cause / EPC registers in the right panel."
+                    label="FPU ($f0–$f31) panel"
+                    description="Show the coprocessor 1 register file in the right panel. Requires Phase 2B engine support."
                     checked={simSettings.coproc01Panels}
                     onChange={(v) => setSimSetting('coproc01Panels', v)}
-                    badge="Phase 2B"
-                    disabled
                   />
                   <Toggle
                     label="Self-modifying code allowed"
