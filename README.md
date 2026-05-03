@@ -10,7 +10,7 @@ The project is built in TypeScript with React, Vite, and Tailwind CSS, and runs 
 
 v1.0 ready. Every PRD must-have and stretch goal shipped; 103 tests passing; full MARS feature parity for the curriculum we target.
 
-See [the PRD](./docs/PRD.md) for the full scope, timeline, and roadmap.
+See [the PRD](./docs/PRD.md) for the full scope, timeline, and roadmap, or [the final report](./docs/FINAL_REPORT.md) for the project writeup.
 
 ## Features
 
