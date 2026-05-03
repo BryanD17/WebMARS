@@ -17,6 +17,13 @@ export interface SyscallIO {
   readChar?:    () => Promise<string>
   confirm?:     (message: string) => Promise<0 | 1 | 2>   // Yes / No / Cancel
   alert?:       (message: string, kind: DialogKind) => Promise<void>
+
+  // Phase 2H — input dialog syscalls. The result tuple wraps the
+  // user's value alongside a `cancelled` flag so the engine can
+  // pick the right MARS status code for $a1 (-3 = cancel, -2 =
+  // invalid input, -4 = buffer too small).
+  promptInt?:    (message: string) => Promise<{ value: number; cancelled: boolean; invalid?: boolean }>
+  promptString?: (message: string) => Promise<{ value: string; cancelled: boolean }>
 }
 
 export function handleSyscall(
@@ -109,6 +116,45 @@ export function handleSyscall(
       const msg = readCStr(memory, registers[4] ?? 0)
       return io.confirm(msg).then((result) => {
         registers[4] = result
+      })
+    }
+    case 51: {
+      // input int dialog. $a0 = prompt addr. Returns int in $a0;
+      // $a1 = 0 on success, -2 on invalid input, -3 on cancel.
+      if (!io.promptInt) throw new Error('Syscall 51 (input int dialog) requires an io.promptInt handler')
+      const msg = readCStr(memory, registers[4] ?? 0)
+      return io.promptInt(msg).then((result) => {
+        if (result.cancelled) {
+          registers[4] = 0
+          registers[5] = -3
+        } else if (result.invalid) {
+          registers[4] = 0
+          registers[5] = -2
+        } else {
+          registers[4] = result.value | 0
+          registers[5] = 0
+        }
+      })
+    }
+    case 53: {
+      // input string dialog. $a0 = prompt addr, $a1 = buffer addr,
+      // $a2 = max byte count (incl. NUL). $a1 = 0 on success,
+      // -3 on cancel, -4 if buffer too small (truncated).
+      if (!io.promptString) throw new Error('Syscall 53 (input string dialog) requires an io.promptString handler')
+      const msg = readCStr(memory, registers[4] ?? 0)
+      const bufAddr = registers[5] ?? 0
+      const maxLen  = (registers[6] ?? 0) | 0
+      return io.promptString(msg).then((result) => {
+        if (result.cancelled) {
+          registers[5] = -3
+          return
+        }
+        const encoded = new TextEncoder().encode(result.value)
+        const truncated = encoded.length > maxLen - 1
+        const writeLen = Math.min(encoded.length, Math.max(0, maxLen - 1))
+        for (let i = 0; i < writeLen; i++) memory.writeByte(bufAddr + i, encoded[i] ?? 0)
+        memory.writeByte(bufAddr + writeLen, 0)
+        registers[5] = truncated ? -4 : 0
       })
     }
     case 54: {

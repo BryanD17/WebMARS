@@ -814,6 +814,24 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         return Promise.resolve()
       },
 
+      // syscall 51 — input int dialog (Phase 2H).
+      promptInt: (message) => {
+        if (typeof window === 'undefined') return Promise.resolve({ value: 0, cancelled: true })
+        const raw = window.prompt(message)
+        if (raw === null) return Promise.resolve({ value: 0, cancelled: true })
+        const n = parseInt(raw.trim(), 10)
+        if (Number.isNaN(n)) return Promise.resolve({ value: 0, cancelled: false, invalid: true })
+        return Promise.resolve({ value: n | 0, cancelled: false })
+      },
+
+      // syscall 53 — input string dialog (Phase 2H).
+      promptString: (message) => {
+        if (typeof window === 'undefined') return Promise.resolve({ value: '', cancelled: true })
+        const raw = window.prompt(message)
+        if (raw === null) return Promise.resolve({ value: '', cancelled: true })
+        return Promise.resolve({ value: raw, cancelled: false })
+      },
+
       exit: () => {
         _stopFlag = true
       },

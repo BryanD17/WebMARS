@@ -7,6 +7,8 @@ interface Trace {
   printed: string[]
   alerts: { message: string; kind: DialogKind }[]
   confirms: string[]
+  promptedInts: string[]
+  promptedStrings: string[]
 }
 
 function makeIO(trace: Trace, overrides: Partial<SyscallIO> = {}): SyscallIO {
@@ -17,6 +19,8 @@ function makeIO(trace: Trace, overrides: Partial<SyscallIO> = {}): SyscallIO {
     readChar: () => Promise.resolve('A'),
     confirm: async (m) => { trace.confirms.push(m); return 0 },
     alert: async (m, kind) => { trace.alerts.push({ message: m, kind }) },
+    promptInt: async (m) => { trace.promptedInts.push(m); return { value: 42, cancelled: false } },
+    promptString: async (m) => { trace.promptedStrings.push(m); return { value: 'hello', cancelled: false } },
     exit: () => {},
     ...overrides,
   }
@@ -25,7 +29,7 @@ function makeIO(trace: Trace, overrides: Partial<SyscallIO> = {}): SyscallIO {
 async function run(source: string, ioOverrides: Partial<SyscallIO> = {}): Promise<Trace> {
   const program = assemble(source)
   expect(program.errors).toEqual([])
-  const trace: Trace = { printed: [], alerts: [], confirms: [] }
+  const trace: Trace = { printed: [], alerts: [], confirms: [], promptedInts: [], promptedStrings: [] }
   const sim = new Simulator(makeIO(trace, ioOverrides))
   sim.load(program)
   await sim.run()
@@ -103,6 +107,70 @@ describe('Extended syscalls (Phase 2E)', () => {
         syscall
     `)
     expect(trace.confirms).toEqual(['Continue?'])
+  })
+
+  it('syscall 51 puts the prompted int in $a0 with status 0 in $a1', async () => {
+    const trace = await run(`
+      .data
+      msg:    .asciiz "Enter:"
+      .text
+      main:
+        la      $a0, msg
+        li      $v0, 51
+        syscall
+        # $a0 should now hold 42; print it
+        li      $v0, 1
+        syscall
+        li      $v0, 10
+        syscall
+    `)
+    expect(trace.promptedInts).toEqual(['Enter:'])
+    expect(trace.printed.join('')).toBe('42')
+  })
+
+  it('syscall 51 sets $a1 to -3 on cancel', async () => {
+    const trace = await run(
+      `
+      .data
+      msg:    .asciiz "Enter:"
+      .text
+      main:
+        la      $a0, msg
+        li      $v0, 51
+        syscall
+        # leak $a1 into $a0 then print
+        add     $a0, $a1, $zero
+        li      $v0, 1
+        syscall
+        li      $v0, 10
+        syscall
+    `,
+      { promptInt: async () => ({ value: 0, cancelled: true }) },
+    )
+    expect(trace.printed.join('')).toBe('-3')
+  })
+
+  it('syscall 53 writes the prompted string into the buffer + NUL', async () => {
+    const trace = await run(`
+      .data
+      msg:    .asciiz "Name:"
+      buf:    .space 64
+      .text
+      main:
+        la      $a0, msg
+        la      $a1, buf
+        li      $a2, 64
+        li      $v0, 53
+        syscall
+        # buf now holds "hello\\0"; print it via syscall 4
+        la      $a0, buf
+        li      $v0, 4
+        syscall
+        li      $v0, 10
+        syscall
+    `)
+    expect(trace.promptedStrings).toEqual(['Name:'])
+    expect(trace.printed.join('')).toBe('hello')
   })
 
   it('syscall 54 invokes io.alert with the prompt + kind from $a1', async () => {
