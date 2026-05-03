@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSimulator } from '@/hooks/useSimulator.ts'
+import { useSimulator, type RecentFile } from '@/hooks/useSimulator.ts'
 import { cn } from './cn.ts'
 
 // Each menu item is either a clickable action, a disabled placeholder
@@ -7,6 +7,19 @@ import { cn } from './cn.ts'
 type MenuItem =
   | { kind: 'action'; label: string; shortcut?: string; onClick?: () => void; disabled?: boolean }
   | { kind: 'separator' }
+
+// Lightweight relative-time helper for the Open Recent submenu —
+// "5m" / "2h" / "3d". Anything beyond a week falls back to ISO date.
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ''
+  const seconds = Math.max(0, (Date.now() - then) / 1000)
+  if (seconds < 60)         return `${Math.floor(seconds)}s`
+  if (seconds < 3600)       return `${Math.floor(seconds / 60)}m`
+  if (seconds < 86400)      return `${Math.floor(seconds / 3600)}h`
+  if (seconds < 604800)     return `${Math.floor(seconds / 86400)}d`
+  return iso.slice(0, 10)
+}
 
 interface MenuDef {
   label: string
@@ -32,7 +45,23 @@ function buildMenus(actions: {
   saveAll: () => Promise<void>
   closeActive: () => Promise<void>
   closeAll: () => Promise<void>
+  recentFiles: ReadonlyArray<RecentFile>
 }): ReadonlyArray<MenuDef> {
+  // Build the File menu's "Open Recent" section dynamically from the
+  // store's recentFiles array. Each entry is a menuitem labeled with
+  // the filename + a relative timestamp; clicking re-opens the file
+  // picker (FS Access API doesn't persist handles across reloads, so
+  // we can't auto-load — the picker is the best we can do).
+  const recentItems: MenuItem[] =
+    actions.recentFiles.length === 0
+      ? [{ kind: 'action', label: '(no recent files)', disabled: true }]
+      : actions.recentFiles.map((r) => ({
+          kind: 'action',
+          label: r.name,
+          shortcut: relativeTime(r.lastOpened),
+          onClick: () => { void actions.openFromDisk() },
+        }))
+
   return [
   {
     label: 'File',
@@ -44,7 +73,9 @@ function buildMenus(actions: {
       { kind: 'action', label: 'Save As…',         shortcut: 'Ctrl+Shift+S', onClick: () => { void actions.saveActiveAs() } },
       { kind: 'action', label: 'Save All',                                   onClick: () => { void actions.saveAll() } },
       { kind: 'separator' },
-      { kind: 'action', label: 'Open Recent',                                disabled: true },
+      { kind: 'action', label: 'Open Recent', disabled: true },
+      ...recentItems,
+      { kind: 'separator' },
       { kind: 'action', label: 'Close',            shortcut: 'Ctrl+W',       onClick: () => { void actions.closeActive() } },
       { kind: 'action', label: 'Close All',                                  onClick: () => { void actions.closeAll() } },
     ],
@@ -134,6 +165,7 @@ export function MenuBar() {
   const closeFile         = useSimulator((s) => s.closeFile)
   const closeAll          = useSimulator((s) => s.closeAll)
   const activeFileId      = useSimulator((s) => s.activeFileId)
+  const recentFiles       = useSimulator((s) => s.recentFiles)
 
   const closeActive = async (): Promise<void> => {
     if (activeFileId !== null) await closeFile(activeFileId)
@@ -152,12 +184,13 @@ export function MenuBar() {
         saveAll,
         closeActive,
         closeAll,
+        recentFiles,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       toggleLeftRail, toggleRightPanel, toggleBottomPanel,
       newFile, openFromDisk, saveActive, saveActiveAs, saveAll,
-      activeFileId, closeFile, closeAll,
+      activeFileId, closeFile, closeAll, recentFiles,
     ],
   )
 
