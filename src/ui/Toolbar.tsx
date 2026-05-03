@@ -1,7 +1,90 @@
-import { useSimulator } from '@/hooks/useSimulator.ts'
+import { useEffect, useRef, useState } from 'react'
+import { useSimulator, type ExampleName } from '@/hooks/useSimulator.ts'
 import { Button } from './Button.tsx'
 import { StatusPill } from './StatusPill.tsx'
 import { cn } from './cn.ts'
+
+const EXAMPLES: ReadonlyArray<{ id: ExampleName; label: string; desc: string }> = [
+  { id: 'arraySum',    label: 'Array Sum',         desc: 'sum the elements of an int array' },
+  { id: 'factorial',   label: 'Factorial',         desc: 'recursive n! with jal/jr' },
+  { id: 'stringPrint', label: 'String Print',      desc: 'print a literal via syscall 4' },
+  { id: 'sumToN',      label: 'Sum 1..N',          desc: 'read N, print 1+2+…+N' },
+  { id: 'syscallIO',   label: 'Syscall I/O',       desc: 'read int, print int (full I/O)' },
+]
+
+function ExamplesDropdown() {
+  const loadFromExample = useSimulator((s) => s.loadFromExample)
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false)
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('mousedown', handleClickOutside)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className={cn(
+          'flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+          open
+            ? 'bg-surface-3 text-ink-1'
+            : 'bg-surface-2 text-ink-1 hover:bg-surface-3',
+        )}
+      >
+        Examples
+        <span aria-hidden="true" className="text-[10px] text-ink-3">▾</span>
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Load example program"
+          className="absolute left-0 top-full z-40 mt-1 min-w-[18rem] rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
+        >
+          {EXAMPLES.map((example) => (
+            <button
+              key={example.id}
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                loadFromExample(example.id)
+                setOpen(false)
+              }}
+              className="block w-full px-3 py-1.5 text-left text-xs text-ink-2 hover:bg-surface-3 hover:text-ink-1 focus-visible:outline-none focus-visible:bg-surface-3"
+            >
+              <div className="font-medium text-ink-1">{example.label}</div>
+              <div className="font-mono text-[10px] text-ink-3" style={{ letterSpacing: '0.04em' }}>
+                {example.desc}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Disabled-placeholder button used for actions wired in later
 // sub-agents (edit ops → SA-4 when Monaco lands, run-loop ops → SA-10).
@@ -89,6 +172,13 @@ export function Toolbar() {
         <FileOpButton label="Save"     title="Save active file (Ctrl+S — keybinding wires in SA-14)" onClick={() => { void saveActive() }}    disabled={!canSaveActive} />
         <FileOpButton label="Save All" title="Save every modified file with a stored handle"         onClick={() => { void saveAll() }}        disabled={!canSaveAll} />
       </div>
+
+      <Divider />
+
+      {/* Examples dropdown — opens one of the 5 bundled .asm files
+         as a new tab via loadFromExample. SA-3 will wire the resulting
+         tab into the multi-file TabStrip so the user sees it appear. */}
+      <ExamplesDropdown />
 
       <Divider />
 
