@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSimulator, type RecentFile } from '@/hooks/useSimulator.ts'
+import { useSimulator, type RecentFile, type ThemeName } from '@/hooks/useSimulator.ts'
 import { cn } from './cn.ts'
 
 // Each menu item is either a clickable action, a disabled placeholder
@@ -46,6 +46,8 @@ function buildMenus(actions: {
   closeActive: () => Promise<void>
   closeAll: () => Promise<void>
   recentFiles: ReadonlyArray<RecentFile>
+  openSettings: () => void
+  setTheme: (next: ThemeName) => void
 }): ReadonlyArray<MenuDef> {
   // Build the File menu's "Open Recent" section dynamically from the
   // store's recentFiles array. Each entry is a menuitem labeled with
@@ -131,11 +133,11 @@ function buildMenus(actions: {
   {
     label: 'Settings',
     items: [
-      { kind: 'action', label: 'Open Settings…', shortcut: 'Ctrl+,',  disabled: true },
+      { kind: 'action', label: 'Open Settings…', shortcut: 'Ctrl+,', onClick: actions.openSettings },
       { kind: 'separator' },
-      { kind: 'action', label: 'Theme · Dark',                       disabled: true },
-      { kind: 'action', label: 'Theme · Light',                      disabled: true },
-      { kind: 'action', label: 'Theme · High Contrast',              disabled: true },
+      { kind: 'action', label: 'Theme · Dark',           onClick: () => actions.setTheme('dark')  },
+      { kind: 'action', label: 'Theme · Light',          onClick: () => actions.setTheme('light') },
+      { kind: 'action', label: 'Theme · High Contrast',  onClick: () => actions.setTheme('hc')    },
     ],
   },
   {
@@ -166,6 +168,8 @@ export function MenuBar() {
   const closeAll          = useSimulator((s) => s.closeAll)
   const activeFileId      = useSimulator((s) => s.activeFileId)
   const recentFiles       = useSimulator((s) => s.recentFiles)
+  const openSettings      = useSimulator((s) => s.openSettings)
+  const setTheme          = useSimulator((s) => s.setTheme)
 
   const closeActive = async (): Promise<void> => {
     if (activeFileId !== null) await closeFile(activeFileId)
@@ -185,12 +189,15 @@ export function MenuBar() {
         closeActive,
         closeAll,
         recentFiles,
+        openSettings,
+        setTheme,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       toggleLeftRail, toggleRightPanel, toggleBottomPanel,
       newFile, openFromDisk, saveActive, saveActiveAs, saveAll,
       activeFileId, closeFile, closeAll, recentFiles,
+      openSettings, setTheme,
     ],
   )
 

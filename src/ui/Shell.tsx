@@ -9,6 +9,7 @@ import { BottomPanel } from './BottomPanel.tsx'
 import { SourcePane } from './SourcePane.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { DevPanel } from './DevPanel.tsx'
+import { SettingsDialog } from './SettingsDialog.tsx'
 
 // 5-band command-center layout. Workspace columns and rows expand and
 // collapse based on the layout slice (right panel open / bottom panel
@@ -18,6 +19,14 @@ import { DevPanel } from './DevPanel.tsx'
 export function Shell() {
   const rightPanelOpen   = useSimulator((s) => s.rightPanelOpen)
   const bottomPanelOpen  = useSimulator((s) => s.bottomPanelOpen)
+  const theme            = useSimulator((s) => s.theme)
+
+  // Apply theme via documentElement.dataset.theme. tokens.css scopes
+  // light + HC overrides under [data-theme="…"] selectors so every
+  // var(--…) reader picks up the new value without code changes.
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   // Block accidental tab close / reload when any file is modified.
   // Reads state imperatively via getState() so the effect doesn't
@@ -63,6 +72,7 @@ export function Shell() {
         <StatusBar />
       </div>
       {import.meta.env.DEV && <DevPanel />}
+      <SettingsDialog />
     </>
   )
 }

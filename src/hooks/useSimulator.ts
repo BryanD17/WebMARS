@@ -347,6 +347,91 @@ function writePersistedMemoryView(view: PersistedMemoryView): void {
   }
 }
 
+// ─ settings (theme / font / simulator toggles) ─
+
+export type ThemeName = 'dark' | 'light' | 'hc'
+
+export const THEMES: ReadonlyArray<ThemeName> = ['dark', 'light', 'hc']
+
+export const EDITOR_FONT_MIN  = 10
+export const EDITOR_FONT_MAX  = 22
+export const EDITOR_FONT_STEP = 1
+
+export interface SimSettings {
+  // Path C placeholders — wired in Phase 2C+. The store accepts the
+  // toggle today so the dialog can persist user preferences; the
+  // simulator engine reads these flags once those phases land.
+  delayedBranching: boolean
+  coproc01Panels: boolean
+  selfModifyingCode: boolean
+}
+
+const SIM_SETTINGS_DEFAULT: SimSettings = {
+  delayedBranching:  false,
+  coproc01Panels:    false,
+  selfModifyingCode: false,
+}
+
+const THEME_STORAGE_KEY        = 'webmars:theme'
+const EDITOR_FONT_STORAGE_KEY  = 'webmars:editor-font'
+const SIM_SETTINGS_STORAGE_KEY = 'webmars:sim-settings'
+
+function readPersistedTheme(): ThemeName {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(THEME_STORAGE_KEY)
+    if (raw && (THEMES as ReadonlyArray<string>).includes(raw)) return raw as ThemeName
+  } catch { /* ignore */ }
+  return 'dark'
+}
+
+function writePersistedTheme(theme: ThemeName): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch { /* ignore */ }
+}
+
+function readPersistedEditorFont(): number {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(EDITOR_FONT_STORAGE_KEY)
+    if (raw === null) return 13
+    const n = Number(raw)
+    if (Number.isFinite(n) && n >= EDITOR_FONT_MIN && n <= EDITOR_FONT_MAX) return n
+  } catch { /* ignore */ }
+  return 13
+}
+
+function writePersistedEditorFont(size: number): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(EDITOR_FONT_STORAGE_KEY, String(size))
+  } catch { /* ignore */ }
+}
+
+function readPersistedSimSettings(): SimSettings {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(SIM_SETTINGS_STORAGE_KEY)
+    if (raw === null) return { ...SIM_SETTINGS_DEFAULT }
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return { ...SIM_SETTINGS_DEFAULT }
+    const obj = parsed as Record<string, unknown>
+    return {
+      delayedBranching:  typeof obj.delayedBranching  === 'boolean' ? obj.delayedBranching  : SIM_SETTINGS_DEFAULT.delayedBranching,
+      coproc01Panels:    typeof obj.coproc01Panels    === 'boolean' ? obj.coproc01Panels    : SIM_SETTINGS_DEFAULT.coproc01Panels,
+      selfModifyingCode: typeof obj.selfModifyingCode === 'boolean' ? obj.selfModifyingCode : SIM_SETTINGS_DEFAULT.selfModifyingCode,
+    }
+  } catch {
+    return { ...SIM_SETTINGS_DEFAULT }
+  }
+}
+
+function writePersistedSimSettings(settings: SimSettings): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(SIM_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+  } catch { /* ignore */ }
+}
+
 // ─ runtime controls ─
 
 const RUN_SPEED_STORAGE_KEY = 'webmars:run-speed'
@@ -516,6 +601,17 @@ interface SimulatorStoreState {
   runToCursor: (line: number) => void
   backstep: () => void
   canBackstep: () => boolean
+
+  // ─ settings slice (additive; theme/font/sim each persisted) ─
+  theme: ThemeName
+  editorFontSize: number
+  simSettings: SimSettings
+  settingsDialogOpen: boolean
+  setTheme: (next: ThemeName) => void
+  setEditorFontSize: (next: number) => void
+  setSimSetting: <K extends keyof SimSettings>(key: K, value: SimSettings[K]) => void
+  openSettings: () => void
+  closeSettings: () => void
 }
 
 let _sim: Simulator | null = null
@@ -913,6 +1009,32 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     },
 
     canBackstep: () => _history.length > 0,
+
+    // settings slice
+    theme:              readPersistedTheme(),
+    editorFontSize:     readPersistedEditorFont(),
+    simSettings:        readPersistedSimSettings(),
+    settingsDialogOpen: false,
+
+    setTheme: (next) => {
+      set({ theme: next })
+      writePersistedTheme(next)
+    },
+
+    setEditorFontSize: (next) => {
+      const clamped = Math.max(EDITOR_FONT_MIN, Math.min(EDITOR_FONT_MAX, Math.round(next)))
+      set({ editorFontSize: clamped })
+      writePersistedEditorFont(clamped)
+    },
+
+    setSimSetting: (key, value) => {
+      const next = { ...get().simSettings, [key]: value }
+      set({ simSettings: next })
+      writePersistedSimSettings(next)
+    },
+
+    openSettings:  () => set({ settingsDialogOpen: true  }),
+    closeSettings: () => set({ settingsDialogOpen: false }),
 
     writeMemoryWord: (addr, value) => {
       if (!_sim) return false

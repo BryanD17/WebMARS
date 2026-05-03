@@ -24,6 +24,7 @@ export function CodeEditor() {
   const setSource        = useSimulator((s) => s.setSource)
   const assemblerErrors  = useSimulator((s) => s.assemblerErrors)
   const breakpoints      = useSimulator((s) => s.breakpoints)
+  const editorFontSize   = useSimulator((s) => s.editorFontSize)
 
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
@@ -137,8 +138,11 @@ export function CodeEditor() {
       }
       options={{
         fontFamily: 'JetBrains Mono, ui-monospace, monospace',
-        fontSize: 13,
-        lineHeight: 20,
+        fontSize: editorFontSize,
+        // line-height auto-derived from fontSize when 0 — Monaco picks
+        // ~1.5x which keeps the gutter glyph centered as the user
+        // resizes via the settings dialog.
+        lineHeight: 0,
         lineNumbers: 'on',
         rulers: [80],
         minimap: { enabled: true, side: 'right', renderCharacters: false },

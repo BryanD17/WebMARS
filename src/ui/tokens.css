@@ -45,6 +45,55 @@
   --shadow-press: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
+/* Light theme — shell-only override (Monaco stays on webmars-dark; the
+   editor is documented as a deliberate exception in src/lib/mipsLanguage.ts).
+   Token names map 1:1 with :root above so every consumer (Tailwind v4
+   bridge in index.css + components reading var(--…) directly) picks up
+   the new value without code changes. */
+[data-theme="light"] {
+  --surface-0:    #fafafa;
+  --surface-1:    #ffffff;
+  --surface-2:    #f4f4f5;
+  --surface-3:    #e4e4e7;
+  --surface-elev: #ffffff;
+  --gutter:       #f4f4f5;
+  --column-guide: #e4e4e7;
+  --border:       #d4d4d8;
+
+  --ink-1: #18181b;
+  --ink-2: #52525b;
+  --ink-3: #a1a1aa;
+
+  --accent: #0891b2;
+  --warn:   #d97706;
+  --danger: #dc2626;
+  --ok:     #059669;
+
+  --shadow-press: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* High-contrast theme — designed for WCAG AAA contrast on the shell.
+   Pure-black surfaces with maxed-out ink + saturated accents. */
+[data-theme="hc"] {
+  --surface-0:    #000000;
+  --surface-1:    #000000;
+  --surface-2:    #0a0a0a;
+  --surface-3:    #1a1a1a;
+  --surface-elev: #0a0a0a;
+  --gutter:       #000000;
+  --column-guide: #2a2a2a;
+  --border:       #ffffff;
+
+  --ink-1: #ffffff;
+  --ink-2: #f4f4f5;
+  --ink-3: #a1a1aa;
+
+  --accent: #00ffff;
+  --warn:   #ffd700;
+  --danger: #ff5555;
+  --ok:     #00ff7f;
+}
+
 /* ─ animations ─────────────────────────────────────────────────────── */
 
 @keyframes pulse-dot {
