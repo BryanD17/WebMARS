@@ -4,6 +4,7 @@ import type { editor as monacoEditor } from 'monaco-editor'
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import { registerMips } from '@/lib/mipsLanguage.ts'
 import { JUMP_TO_LINE_EVENT, type JumpToLineDetail } from '@/lib/jumpToLine.ts'
+import { setEditorCursorReader } from '@/lib/editorCursor.ts'
 
 // Wraps @monaco-editor/react with the WebMARS MIPS language + dark
 // theme + IDE-density editor options. Replaces SourcePane's previous
@@ -50,6 +51,11 @@ export function CodeEditor() {
         }
       }
     })
+
+    // Register the cursor reader so the toolbar's Run-to-cursor
+    // button can snapshot the current cursor line without holding
+    // a Monaco ref of its own.
+    setEditorCursorReader(() => editor.getPosition()?.lineNumber ?? null)
   }
 
   // Apply / clear assembler-error markers whenever the error array

@@ -519,6 +519,10 @@ interface SimulatorStoreState {
 
 let _sim: Simulator | null = null
 let _stopFlag = false
+// Set by runToCursor; the run loop halts when sim.getCurrentLine()
+// matches. Cleared on hit, on reset, and when run() exits for any
+// other reason.
+let _tempBreakpoint: number | null = null
 
 export const useSimulator = create<SimulatorStoreState>((set, get) => {
   function makeSim(): Simulator {
@@ -774,8 +778,10 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     },
 
     runToCursor: (line) => {
-      // Implemented in commit 2.
-      void line
+      const status = get().status
+      if (status !== 'ready' && status !== 'paused') return
+      _tempBreakpoint = line
+      get().run()
     },
 
     backstep: () => {
@@ -1106,11 +1112,19 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
             // Breakpoint check: the line ABOUT to execute. If the
             // user just clicked Run from a breakpoint, the first
             // iteration steps past it (otherwise we'd be stuck);
-            // subsequent matches halt.
+            // subsequent matches halt. The temp breakpoint set by
+            // runToCursor is checked alongside the persistent set
+            // and cleared on hit — single-use, never persisted.
             const breakpoints = get().breakpoints
-            if (breakpoints.size > 0 && i > 0) {
-              const currentLine = sim.getCurrentLine()
-              if (currentLine !== null && breakpoints.has(currentLine)) {
+            const currentLine = sim.getCurrentLine()
+            if (i > 0 && currentLine !== null) {
+              if (_tempBreakpoint !== null && _tempBreakpoint === currentLine) {
+                hitBreakpoint = true
+                get().logMessage('info', `Run to cursor: stopped at line ${currentLine}.`, currentLine)
+                _tempBreakpoint = null
+                break
+              }
+              if (breakpoints.size > 0 && breakpoints.has(currentLine)) {
                 hitBreakpoint = true
                 get().logMessage('info', `Halted at breakpoint on line ${currentLine}.`, currentLine)
                 break
@@ -1159,6 +1173,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
 
     reset: () => {
       _stopFlag = true
+      _tempBreakpoint = null
       const sim = _sim
       if (sim) sim.reset()
       const engineState = sim?.getState()

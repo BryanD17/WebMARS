@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSimulator, type ExampleName, RUN_SPEED_STOPS } from '@/hooks/useSimulator.ts'
+import { getEditorCursor } from '@/lib/editorCursor.ts'
 import { Button } from './Button.tsx'
 import { StatusPill } from './StatusPill.tsx'
 import { cn } from './cn.ts'
@@ -188,6 +189,7 @@ export function Toolbar() {
   const step          = useSimulator((s) => s.step)
   const reset         = useSimulator((s) => s.reset)
   const pause         = useSimulator((s) => s.pause)
+  const runToCursor   = useSimulator((s) => s.runToCursor)
   const newFile       = useSimulator((s) => s.newFile)
   const openFromDisk  = useSimulator((s) => s.openFromDisk)
   const saveActive    = useSimulator((s) => s.saveActive)
@@ -274,8 +276,20 @@ export function Toolbar() {
         >
           Step
         </Button>
-        <PlaceholderButton label="Backstep"     title="Backstep (Shift+F7) — wired in SA-10" />
-        <PlaceholderButton label="→ Cursor"     title="Run to cursor (F8) — wired in SA-10" />
+        <PlaceholderButton label="Backstep"     title="Backstep (Shift+F7) — wired in SA-10 commit 3" />
+        <Button
+          variant="ghost"
+          disabled={noSource || (status !== 'ready' && status !== 'paused')}
+          aria-disabled={noSource || (status !== 'ready' && status !== 'paused')}
+          onClick={() => {
+            const line = getEditorCursor()
+            if (typeof line === 'number') runToCursor(line)
+          }}
+          title="Run until the editor cursor's line (F8 — keybinding wires in SA-14)"
+          className="px-2 py-1 text-xs"
+        >
+          → Cursor
+        </Button>
         <Button
           variant="ghost"
           disabled={noSource}
