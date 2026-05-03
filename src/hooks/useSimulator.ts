@@ -117,6 +117,8 @@ export type LeftPanelKey =
 
 export type BottomPanelTab = 'console' | 'messages' | 'problems'
 
+export type NumberBase = 'hex' | 'dec' | 'bin'
+
 interface PersistedLayout {
   leftRailExpanded: boolean
   leftPanelKey: LeftPanelKey
@@ -130,6 +132,30 @@ const LEFT_PANEL_KEYS: ReadonlyArray<LeftPanelKey> = [
   'project', 'symbols', 'breakpoints', 'reference', 'syscalls', 'recent', 'tools',
 ]
 const BOTTOM_PANEL_TABS: ReadonlyArray<BottomPanelTab> = ['console', 'messages', 'problems']
+
+const NUMBER_BASE_STORAGE_KEY = 'webmars:number-base'
+const NUMBER_BASES: ReadonlyArray<NumberBase> = ['hex', 'dec', 'bin']
+
+function readPersistedNumberBase(): NumberBase {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(NUMBER_BASE_STORAGE_KEY)
+    if (raw && (NUMBER_BASES as ReadonlyArray<string>).includes(raw)) {
+      return raw as NumberBase
+    }
+  } catch {
+    // ignore
+  }
+  return 'hex'
+}
+
+function writePersistedNumberBase(base: NumberBase): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(NUMBER_BASE_STORAGE_KEY, base)
+  } catch {
+    // ignore
+  }
+}
 
 function readPersistedLayout(): Partial<PersistedLayout> {
   try {
@@ -288,6 +314,10 @@ interface SimulatorStoreState {
   setBottomTab: (tab: BottomPanelTab) => void
   toggleRightPanel: () => void
 
+  // ─ view slice (additive; persisted to webmars:number-base) ─
+  numberBase: NumberBase
+  setNumberBase: (base: NumberBase) => void
+
   // ─ file slice (additive; recents persisted to webmars:recent-files) ─
   files: FileEntry[]
   activeFileId: string | null
@@ -392,6 +422,14 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     toggleRightPanel: () => {
       set((s) => ({ rightPanelOpen: !s.rightPanelOpen }))
       persistLayout()
+    },
+
+    // view slice
+    numberBase: readPersistedNumberBase(),
+
+    setNumberBase: (base) => {
+      set({ numberBase: base })
+      writePersistedNumberBase(base)
     },
 
     setSource: (next) => set((s) => ({
