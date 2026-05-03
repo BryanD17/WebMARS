@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSimulator } from '@/hooks/useSimulator.ts'
 import { cn } from './cn.ts'
 
 // Each menu item is either a clickable action, a disabled placeholder
@@ -16,7 +17,16 @@ interface MenuDef {
 // disabled with a clear "wired in SA-N" marker so the menubar reads
 // as scaffolded but inert. Adding a real handler in a later sub-agent
 // is a one-line edit (replace `disabled: true` with `onClick: ...`).
-const MENUS: ReadonlyArray<MenuDef> = [
+//
+// Exception: SA-1 commit 5 wires the View menu's three layout toggles
+// because the layout slice is now in the store; everything else stays
+// disabled until its sub-agent lands.
+function buildMenus(actions: {
+  toggleLeftRail: () => void
+  toggleRightPanel: () => void
+  toggleBottomPanel: () => void
+}): ReadonlyArray<MenuDef> {
+  return [
   {
     label: 'File',
     items: [
@@ -48,9 +58,9 @@ const MENUS: ReadonlyArray<MenuDef> = [
   {
     label: 'View',
     items: [
-      { kind: 'action', label: 'Toggle Left Rail',     shortcut: 'Ctrl+B',     disabled: true },
-      { kind: 'action', label: 'Toggle Right Panel',   shortcut: 'Ctrl+Alt+B', disabled: true },
-      { kind: 'action', label: 'Toggle Bottom Panel',  shortcut: 'Ctrl+J',     disabled: true },
+      { kind: 'action', label: 'Toggle Left Rail',     shortcut: 'Ctrl+B',     onClick: actions.toggleLeftRail    },
+      { kind: 'action', label: 'Toggle Right Panel',   shortcut: 'Ctrl+Alt+B', onClick: actions.toggleRightPanel  },
+      { kind: 'action', label: 'Toggle Bottom Panel',  shortcut: 'Ctrl+J',     onClick: actions.toggleBottomPanel },
       { kind: 'separator' },
       { kind: 'action', label: 'Number Base · Hex',                            disabled: true },
       { kind: 'action', label: 'Number Base · Dec',                            disabled: true },
@@ -99,11 +109,21 @@ const MENUS: ReadonlyArray<MenuDef> = [
       { kind: 'action', label: 'About WebMARS',                      disabled: true },
     ],
   },
-]
+  ]
+}
 
 export function MenuBar() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
   const containerRef = useRef<HTMLElement>(null)
+
+  const toggleLeftRail    = useSimulator((s) => s.toggleLeftRail)
+  const toggleRightPanel  = useSimulator((s) => s.toggleRightPanel)
+  const toggleBottomPanel = useSimulator((s) => s.toggleBottomPanel)
+
+  const menus = useMemo(
+    () => buildMenus({ toggleLeftRail, toggleRightPanel, toggleBottomPanel }),
+    [toggleLeftRail, toggleRightPanel, toggleBottomPanel],
+  )
 
   // Click outside or Escape closes the open menu.
   useEffect(() => {
@@ -141,7 +161,7 @@ export function MenuBar() {
         WebMARS
       </span>
 
-      {MENUS.map((menu, i) => {
+      {menus.map((menu, i) => {
         const isOpen = openIndex === i
         return (
           <div key={menu.label} className="relative">

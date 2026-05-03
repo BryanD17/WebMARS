@@ -96,6 +96,71 @@ function toContractErrors(errs: { line: number; message: string }[]): AssemblerE
   return errs.map((e) => ({ line: e.line, message: e.message }))
 }
 
+// ─ layout slice (additive — frozen contract preserved) ─
+
+export type LeftPanelKey =
+  | 'project' | 'symbols' | 'breakpoints' | 'reference' | 'syscalls' | 'recent' | 'tools'
+
+export type BottomPanelTab = 'console' | 'messages' | 'problems'
+
+interface PersistedLayout {
+  leftRailExpanded: boolean
+  leftPanelKey: LeftPanelKey
+  bottomPanelOpen: boolean
+  bottomPanelTab: BottomPanelTab
+  rightPanelOpen: boolean
+}
+
+const LAYOUT_STORAGE_KEY = 'webmars:layout'
+const LEFT_PANEL_KEYS: ReadonlyArray<LeftPanelKey> = [
+  'project', 'symbols', 'breakpoints', 'reference', 'syscalls', 'recent', 'tools',
+]
+const BOTTOM_PANEL_TABS: ReadonlyArray<BottomPanelTab> = ['console', 'messages', 'problems']
+
+function readPersistedLayout(): Partial<PersistedLayout> {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(LAYOUT_STORAGE_KEY)
+    if (raw === null) return {}
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return {}
+    const out: Partial<PersistedLayout> = {}
+    const obj = parsed as Record<string, unknown>
+    if (typeof obj.leftRailExpanded === 'boolean') out.leftRailExpanded = obj.leftRailExpanded
+    if (typeof obj.bottomPanelOpen === 'boolean')  out.bottomPanelOpen  = obj.bottomPanelOpen
+    if (typeof obj.rightPanelOpen === 'boolean')   out.rightPanelOpen   = obj.rightPanelOpen
+    if (typeof obj.leftPanelKey === 'string' && (LEFT_PANEL_KEYS as ReadonlyArray<string>).includes(obj.leftPanelKey)) {
+      out.leftPanelKey = obj.leftPanelKey as LeftPanelKey
+    }
+    if (typeof obj.bottomPanelTab === 'string' && (BOTTOM_PANEL_TABS as ReadonlyArray<string>).includes(obj.bottomPanelTab)) {
+      out.bottomPanelTab = obj.bottomPanelTab as BottomPanelTab
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function writePersistedLayout(layout: PersistedLayout): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout))
+  } catch {
+    // localStorage can throw under privacy mode / quota — silent fall-through is fine
+  }
+}
+
+function computeInitialLayout(): PersistedLayout {
+  const persisted = readPersistedLayout()
+  const width = typeof window === 'undefined' ? 1280 : window.innerWidth
+  return {
+    leftRailExpanded: persisted.leftRailExpanded ?? width >= 1280,
+    leftPanelKey:    persisted.leftPanelKey    ?? 'project',
+    bottomPanelOpen: persisted.bottomPanelOpen ?? width >= 768,
+    bottomPanelTab:  persisted.bottomPanelTab  ?? 'console',
+    rightPanelOpen:  persisted.rightPanelOpen  ?? width >= 1024,
+  }
+}
+
 interface SimulatorStoreState {
   // ─ contract fields (must match src/hooks/types.ts) ─
   source: string
@@ -118,6 +183,19 @@ interface SimulatorStoreState {
   // ─ extensions (engine-specific, not required by contract) ─
   stop: () => void
   program: AssembledProgram | null
+
+  // ─ layout slice (additive; persisted to webmars:layout) ─
+  leftRailExpanded: boolean
+  leftPanelKey: LeftPanelKey
+  bottomPanelOpen: boolean
+  bottomPanelTab: BottomPanelTab
+  rightPanelOpen: boolean
+
+  toggleLeftRail: () => void
+  setLeftPanel: (key: LeftPanelKey) => void
+  toggleBottomPanel: () => void
+  setBottomTab: (tab: BottomPanelTab) => void
+  toggleRightPanel: () => void
 }
 
 let _sim: Simulator | null = null
@@ -140,6 +218,19 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     return _sim
   }
 
+  const initialLayout = computeInitialLayout()
+
+  function persistLayout(): void {
+    const s = get()
+    writePersistedLayout({
+      leftRailExpanded: s.leftRailExpanded,
+      leftPanelKey:     s.leftPanelKey,
+      bottomPanelOpen:  s.bottomPanelOpen,
+      bottomPanelTab:   s.bottomPanelTab,
+      rightPanelOpen:   s.rightPanelOpen,
+    })
+  }
+
   return {
     source: HELLO_MIPS_SOURCE,
     status: 'idle',
@@ -149,6 +240,34 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     runtimeError: null,
     inspectorTab: 'registers',
     program: null,
+
+    // layout slice — initial values from localStorage (or viewport defaults)
+    leftRailExpanded: initialLayout.leftRailExpanded,
+    leftPanelKey:     initialLayout.leftPanelKey,
+    bottomPanelOpen:  initialLayout.bottomPanelOpen,
+    bottomPanelTab:   initialLayout.bottomPanelTab,
+    rightPanelOpen:   initialLayout.rightPanelOpen,
+
+    toggleLeftRail: () => {
+      set((s) => ({ leftRailExpanded: !s.leftRailExpanded }))
+      persistLayout()
+    },
+    setLeftPanel: (key) => {
+      set({ leftPanelKey: key })
+      persistLayout()
+    },
+    toggleBottomPanel: () => {
+      set((s) => ({ bottomPanelOpen: !s.bottomPanelOpen }))
+      persistLayout()
+    },
+    setBottomTab: (tab) => {
+      set({ bottomPanelTab: tab })
+      persistLayout()
+    },
+    toggleRightPanel: () => {
+      set((s) => ({ rightPanelOpen: !s.rightPanelOpen }))
+      persistLayout()
+    },
 
     setSource: (next) => set({ source: next }),
 

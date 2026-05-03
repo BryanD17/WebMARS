@@ -1,3 +1,4 @@
+import { useSimulator } from '@/hooks/useSimulator.ts'
 import { MenuBar } from './MenuBar.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TabStrip } from './TabStrip.tsx'
@@ -8,31 +9,36 @@ import { SourcePane } from './SourcePane.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { DevPanel } from './DevPanel.tsx'
 
-// 5-band command-center layout:
-//   Band 1  Menu Bar        32px
-//   Band 2  Primary Toolbar 44px
-//   Band 3  Tab Strip       36px
-//   Band 4  Workspace       1fr  (Left rail / Center / Right panel, with
-//                                  bottom panel docked under center)
-//   Band 5  Status Bar      24px
-//
-// Every level uses min-h-0 + overflow-hidden so internal scroll works.
-// SA-2 → SA-16 fill in the placeholders these components currently
-// render.
+// 5-band command-center layout. Workspace columns and rows expand and
+// collapse based on the layout slice (right panel open / bottom panel
+// open). Persisted to webmars:layout via the store; defaults read
+// viewport width on first paint to pick reasonable values for laptops
+// vs. ultrawides.
 export function Shell() {
+  const rightPanelOpen   = useSimulator((s) => s.rightPanelOpen)
+  const bottomPanelOpen  = useSimulator((s) => s.bottomPanelOpen)
+
+  const workspaceCols = rightPanelOpen
+    ? 'grid-cols-[auto_1fr_360px]'
+    : 'grid-cols-[auto_1fr]'
+
+  const centerRows = bottomPanelOpen
+    ? 'grid-rows-[1fr_auto]'
+    : 'grid-rows-[1fr_28px]'
+
   return (
     <>
       <div className="grid h-dvh grid-rows-[32px_44px_36px_1fr_24px] overflow-hidden bg-surface-0 text-ink-1">
         <MenuBar />
         <Toolbar />
         <TabStrip />
-        <div className="grid min-h-0 grid-cols-[auto_1fr_360px] overflow-hidden">
+        <div className={`grid min-h-0 ${workspaceCols} overflow-hidden`}>
           <LeftRail />
-          <div className="grid min-h-0 grid-rows-[1fr_auto] overflow-hidden">
+          <div className={`grid min-h-0 ${centerRows} overflow-hidden`}>
             <SourcePane />
             <BottomPanel />
           </div>
-          <RightPanel />
+          {rightPanelOpen && <RightPanel />}
         </div>
         <StatusBar />
       </div>
