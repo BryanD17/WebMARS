@@ -1,4 +1,4 @@
-import { useSimulator } from '@/hooks/useSimulator.ts'
+import { useSimulator, type NumberBase } from '@/hooks/useSimulator.ts'
 import type { RegisterSnapshot } from '@/hooks/types.ts'
 import { cn } from './cn.ts'
 
@@ -34,9 +34,16 @@ const SPECIAL_GROUP: Group = {
   registers: ['PC', 'HI', 'LO'],
 }
 
-function formatHex(value: number): string {
-  // Coerce to unsigned 32-bit so negatives display as 0xFFFFFFFF, not -1.
-  return '0x' + (value >>> 0).toString(16).padStart(8, '0')
+// Format an int32 value in the requested base.
+//   hex → 0x00000000 (unsigned, padded to 8 nibbles, lowercase)
+//   dec → signed decimal (as int32 — matches how MIPS programs reason)
+//   bin → 0b…0 (unsigned, padded to 32 bits)
+function formatValue(value: number, base: NumberBase): string {
+  switch (base) {
+    case 'hex': return '0x' + (value >>> 0).toString(16).padStart(8, '0')
+    case 'dec': return ((value | 0)).toString(10)
+    case 'bin': return '0b' + (value >>> 0).toString(2).padStart(32, '0')
+  }
 }
 
 function valueAndChangedFor(
@@ -63,24 +70,26 @@ interface RowProps {
   name: string
   value: number
   changed: boolean
+  base: NumberBase
 }
 
-function RegisterRow({ index, name, value, changed }: RowProps) {
-  // Even rows get a subtle --surface-2 stripe; odd rows stay transparent
-  // so the inspector's --surface-1 chrome shows through. Stripes
-  // continue across groups (don't reset).
+function RegisterRow({ index, name, value, changed, base }: RowProps) {
   const stripe = index % 2 === 0 ? 'bg-surface-2' : 'bg-transparent'
-  // Visual rule: a register value reads as "set" (--ink-1) if it is
-  // non-zero OR was just touched by a step. Zero-and-untouched values
-  // dim to --ink-3 so the eye finds the live state quickly.
   const valueColor = value === 0 && !changed ? 'text-ink-3' : 'text-ink-1'
   return (
-    <div className={cn('grid grid-cols-[60px_1fr] items-center', stripe)}>
+    <div className={cn('grid items-center', stripe)} style={{ gridTemplateColumns: '60px 1fr' }}>
       <div className="px-3 py-1 text-sm text-ink-2">{name}</div>
       <div
-        className={cn('px-3 py-1 text-right text-sm tabular-nums', valueColor)}
+        className={cn(
+          'px-3 py-1 text-right text-sm tabular-nums',
+          // bin values are 34 chars wide — let them overflow with
+          // horizontal scroll on the row's value cell rather than
+          // wrapping or clipping.
+          base === 'bin' ? 'overflow-x-auto whitespace-nowrap' : '',
+          valueColor,
+        )}
       >
-        {formatHex(value)}
+        {formatValue(value, base)}
       </div>
     </div>
   )
@@ -98,47 +107,51 @@ function GroupLabel({ label }: { label: string }) {
   )
 }
 
+const BASES: ReadonlyArray<{ id: NumberBase; label: string }> = [
+  { id: 'hex', label: 'HEX' },
+  { id: 'dec', label: 'DEC' },
+  { id: 'bin', label: 'BIN' },
+]
+
 function BaseToggle() {
+  const numberBase    = useSimulator((s) => s.numberBase)
+  const setNumberBase = useSimulator((s) => s.setNumberBase)
+
   return (
     <div
       role="group"
       aria-label="Number base"
       className="inline-flex overflow-hidden rounded-md border border-divider"
     >
-      <button
-        type="button"
-        aria-pressed="true"
-        className="bg-surface-2 px-3 py-1 font-mono text-xs uppercase text-ink-1"
-        style={{ letterSpacing: '0.06em' }}
-      >
-        HEX
-      </button>
-      <button
-        type="button"
-        disabled
-        aria-disabled="true"
-        title="Decimal view wires in on Day 3"
-        className="border-l border-divider px-3 py-1 font-mono text-xs uppercase text-ink-3 disabled:cursor-not-allowed"
-        style={{ letterSpacing: '0.06em' }}
-      >
-        DEC
-      </button>
-      <button
-        type="button"
-        disabled
-        aria-disabled="true"
-        title="Binary view wires in on Day 3"
-        className="border-l border-divider px-3 py-1 font-mono text-xs uppercase text-ink-3 disabled:cursor-not-allowed"
-        style={{ letterSpacing: '0.06em' }}
-      >
-        BIN
-      </button>
+      {BASES.map((opt, i) => {
+        const active = numberBase === opt.id
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => setNumberBase(opt.id)}
+            className={cn(
+              'px-3 py-1 font-mono text-xs uppercase transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
+              i > 0 && 'border-l border-divider',
+              active
+                ? 'bg-surface-2 text-ink-1'
+                : 'text-ink-3 hover:bg-surface-2 hover:text-ink-2',
+            )}
+            style={{ letterSpacing: '0.06em' }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
 
 export function RegisterTable() {
-  const registers = useSimulator((s) => s.registers)
+  const registers  = useSimulator((s) => s.registers)
+  const numberBase = useSimulator((s) => s.numberBase)
 
   // Pre-compute the running row index for each group so stripes stay
   // continuous across group boundaries.
@@ -175,6 +188,7 @@ export function RegisterTable() {
                   name={name}
                   value={value}
                   changed={changed}
+                  base={numberBase}
                 />
               )
             })}
@@ -192,6 +206,7 @@ export function RegisterTable() {
                 name={name}
                 value={value}
                 changed={changed}
+                base={numberBase}
               />
             )
           })}
