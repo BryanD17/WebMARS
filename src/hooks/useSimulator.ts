@@ -346,6 +346,39 @@ function writePersistedMemoryView(view: PersistedMemoryView): void {
   }
 }
 
+// ─ breakpoints (per-file) ─
+
+const BREAKPOINTS_STORAGE_PREFIX = 'webmars:breakpoints:'
+
+function readPersistedBreakpoints(filename: string): Set<number> {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(BREAKPOINTS_STORAGE_PREFIX + filename)
+    if (raw === null) return new Set()
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    const out = new Set<number>()
+    for (const v of parsed) {
+      if (typeof v === 'number' && Number.isInteger(v) && v > 0) out.add(v)
+    }
+    return out
+  } catch {
+    return new Set()
+  }
+}
+
+function writePersistedBreakpoints(filename: string, lines: ReadonlySet<number>): void {
+  try {
+    if (typeof window === 'undefined') return
+    if (lines.size === 0) {
+      window.localStorage.removeItem(BREAKPOINTS_STORAGE_PREFIX + filename)
+    } else {
+      window.localStorage.setItem(BREAKPOINTS_STORAGE_PREFIX + filename, JSON.stringify([...lines]))
+    }
+  } catch {
+    // ignore
+  }
+}
+
 // ─ console input ─
 
 export type PendingInputKind = 'int' | 'string' | 'char'
@@ -445,6 +478,11 @@ interface SimulatorStoreState {
   setActiveFile: (id: string) => void
   reorderFiles: (fromIndex: number, toIndex: number) => void
   loadFromExample: (name: ExampleName) => void
+
+  // ─ breakpoints slice (additive; persisted per-file) ─
+  breakpoints: ReadonlySet<number>     // line numbers, ACTIVE file's set
+  toggleBreakpoint: (line: number) => void
+  clearAllBreakpoints: () => void
 }
 
 let _sim: Simulator | null = null
@@ -667,6 +705,27 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       set({ memoryWords: next, memoryChanged: changed })
     },
 
+    // breakpoints slice — operates on the ACTIVE file's set,
+    // persisted per filename in localStorage.
+    breakpoints: new Set<number>(),
+
+    toggleBreakpoint: (line) => {
+      const s = get()
+      const next = new Set(s.breakpoints)
+      if (next.has(line)) next.delete(line)
+      else next.add(line)
+      const active = s.files.find((f) => f.id === s.activeFileId)
+      if (active) writePersistedBreakpoints(active.name, next)
+      set({ breakpoints: next })
+    },
+
+    clearAllBreakpoints: () => {
+      const s = get()
+      const active = s.files.find((f) => f.id === s.activeFileId)
+      if (active) writePersistedBreakpoints(active.name, new Set())
+      set({ breakpoints: new Set<number>() })
+    },
+
     writeMemoryWord: (addr, value) => {
       if (!_sim) return false
       const aligned = (addr & ~0x3) >>> 0
@@ -851,7 +910,12 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const s = get()
       const target = s.files.find((f) => f.id === id)
       if (!target) return
-      set({ activeFileId: id, source: target.source })
+      set({
+        activeFileId: id,
+        source: target.source,
+        // Switch to the new file's breakpoint set.
+        breakpoints: readPersistedBreakpoints(target.name),
+      })
     },
 
     reorderFiles: (fromIndex, toIndex) => {
@@ -976,7 +1040,21 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       set({ status: 'running' })
       void (async () => {
         try {
+          let hitBreakpoint = false
           for (let i = 0; i < 1_000_000 && !sim.isHalted() && !_stopFlag; i++) {
+            // Breakpoint check: the line ABOUT to execute. If the
+            // user just clicked Run from a breakpoint, the first
+            // iteration steps past it (otherwise we'd be stuck);
+            // subsequent matches halt.
+            const breakpoints = get().breakpoints
+            if (breakpoints.size > 0 && i > 0) {
+              const currentLine = sim.getCurrentLine()
+              if (currentLine !== null && breakpoints.has(currentLine)) {
+                hitBreakpoint = true
+                get().logMessage('info', `Halted at breakpoint on line ${currentLine}.`, currentLine)
+                break
+              }
+            }
             const prevRegisters = get().registers
             await sim.step()
             if (i % 500 === 0) {
@@ -988,7 +1066,10 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           const engineState = sim.getState()
           const prevRegisters = get().registers
           set({
-            status: sim.isHalted() ? 'halted' : _stopFlag ? 'paused' : 'paused',
+            status:
+              sim.isHalted() ? 'halted'
+              : (_stopFlag || hitBreakpoint) ? 'paused'
+              : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
           })
           get().refreshMemorySnapshot()
