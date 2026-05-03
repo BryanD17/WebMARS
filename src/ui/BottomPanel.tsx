@@ -1,5 +1,5 @@
 import { useSimulator, type BottomPanelTab } from '@/hooks/useSimulator.ts'
-import { ConsoleEmpty } from './ConsoleEmpty.tsx'
+import { ConsolePanel } from './ConsolePanel.tsx'
 import { cn } from './cn.ts'
 
 const TABS: ReadonlyArray<{ id: BottomPanelTab; label: string }> = [
@@ -83,19 +83,23 @@ export function BottomPanel() {
       </div>
 
       {open && (
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
-          {activeTab === 'console' && <ConsoleEmpty />}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {activeTab === 'console'  && <ConsolePanel />}
           {activeTab === 'messages' && (
-            <PlaceholderBody
-              description="Run-state transitions, assemble events, and notable runtime messages will land here."
-              futureSubAgent="SA-6"
-            />
+            <div className="h-full overflow-y-auto px-3 py-2">
+              <PlaceholderBody
+                description="Run-state transitions, assemble events, and notable runtime messages will land here."
+                futureSubAgent="SA-6 commit 3"
+              />
+            </div>
           )}
           {activeTab === 'problems' && (
-            <PlaceholderBody
-              description="Aggregated assembler and runtime errors will appear here, click-to-jump to the offending line."
-              futureSubAgent="SA-6"
-            />
+            <div className="h-full overflow-y-auto px-3 py-2">
+              <PlaceholderBody
+                description="Aggregated assembler and runtime errors will appear here, click-to-jump to the offending line."
+                futureSubAgent="SA-6 commit 3"
+              />
+            </div>
           )}
         </div>
       )}
