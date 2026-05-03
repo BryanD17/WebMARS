@@ -346,6 +346,30 @@ function writePersistedMemoryView(view: PersistedMemoryView): void {
   }
 }
 
+// ─ runtime controls ─
+
+const RUN_SPEED_STORAGE_KEY = 'webmars:run-speed'
+// Discrete throttle stops, surfaced by the toolbar slider. 0 = ∞
+// (unlimited).
+export const RUN_SPEED_STOPS: ReadonlyArray<number> = [1, 5, 10, 30, 60, 100, 500, 0]
+
+function readPersistedRunSpeed(): number {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(RUN_SPEED_STORAGE_KEY)
+    if (raw === null) return 0
+    const n = Number(raw)
+    if (Number.isFinite(n) && (RUN_SPEED_STOPS as ReadonlyArray<number>).includes(n)) return n
+    return 0
+  } catch { return 0 }
+}
+
+function writePersistedRunSpeed(speed: number): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(RUN_SPEED_STORAGE_KEY, String(speed))
+  } catch { /* ignore */ }
+}
+
 // ─ breakpoints (per-file) ─
 
 const BREAKPOINTS_STORAGE_PREFIX = 'webmars:breakpoints:'
@@ -483,6 +507,14 @@ interface SimulatorStoreState {
   breakpoints: ReadonlySet<number>     // line numbers, ACTIVE file's set
   toggleBreakpoint: (line: number) => void
   clearAllBreakpoints: () => void
+
+  // ─ runtime controls slice (additive; runSpeed persisted) ─
+  runSpeed: number                     // 0 = unlimited; otherwise instructions/sec
+  setRunSpeed: (next: number) => void
+  pause: () => void
+  runToCursor: (line: number) => void
+  backstep: () => void
+  canBackstep: () => boolean
 }
 
 let _sim: Simulator | null = null
@@ -724,6 +756,35 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const active = s.files.find((f) => f.id === s.activeFileId)
       if (active) writePersistedBreakpoints(active.name, new Set())
       set({ breakpoints: new Set<number>() })
+    },
+
+    // runtime controls slice
+    runSpeed: readPersistedRunSpeed(),
+
+    setRunSpeed: (next) => {
+      set({ runSpeed: next })
+      writePersistedRunSpeed(next)
+    },
+
+    pause: () => {
+      // Setting _stopFlag breaks the run loop on its next iteration;
+      // the loop's finally-block sets status='paused' and refreshes
+      // snapshots.
+      _stopFlag = true
+    },
+
+    runToCursor: (line) => {
+      // Implemented in commit 2.
+      void line
+    },
+
+    backstep: () => {
+      // Implemented in commit 3.
+    },
+
+    canBackstep: () => {
+      // Implemented in commit 3.
+      return false
     },
 
     writeMemoryWord: (addr, value) => {
@@ -1055,12 +1116,25 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
                 break
               }
             }
+            // Speed throttle: 0 = unlimited; otherwise sleep
+            // 1000/speed ms between instructions. Yields the event
+            // loop unconditionally every 500 instructions even at
+            // unlimited speed so the UI thread stays responsive.
+            const runSpeed = get().runSpeed
+            if (runSpeed > 0) {
+              await new Promise<void>((r) => setTimeout(r, 1000 / runSpeed))
+            }
             const prevRegisters = get().registers
             await sim.step()
-            if (i % 500 === 0) {
+            if (runSpeed === 0 && i % 500 === 0) {
               const engineState = sim.getState()
               set({ registers: buildSnapshot(engineState, prevRegisters) })
               await new Promise<void>((r) => setTimeout(r, 0))
+            } else if (runSpeed > 0) {
+              // At any throttled speed, push register updates after
+              // every step so the user can watch them tick.
+              const engineState = sim.getState()
+              set({ registers: buildSnapshot(engineState, prevRegisters) })
             }
           }
           const engineState = sim.getState()

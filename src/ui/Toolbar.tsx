@@ -1,8 +1,48 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSimulator, type ExampleName } from '@/hooks/useSimulator.ts'
+import { useSimulator, type ExampleName, RUN_SPEED_STOPS } from '@/hooks/useSimulator.ts'
 import { Button } from './Button.tsx'
 import { StatusPill } from './StatusPill.tsx'
 import { cn } from './cn.ts'
+
+function speedLabel(speed: number): string {
+  if (speed === 0) return '∞'
+  return `${speed}/s`
+}
+
+function SpeedSlider() {
+  const runSpeed    = useSimulator((s) => s.runSpeed)
+  const setRunSpeed = useSimulator((s) => s.setRunSpeed)
+
+  // The slider's value is the index into RUN_SPEED_STOPS; the
+  // displayed label and the actual store value derive from that.
+  const currentIndex = Math.max(0, RUN_SPEED_STOPS.indexOf(runSpeed))
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-ink-3" aria-label="Run speed">
+      <span style={{ letterSpacing: '0.04em' }}>Speed</span>
+      <input
+        type="range"
+        min={0}
+        max={RUN_SPEED_STOPS.length - 1}
+        step={1}
+        value={currentIndex}
+        onChange={(event) => {
+          const idx = Number(event.target.value)
+          const next = RUN_SPEED_STOPS[idx]
+          if (typeof next === 'number') setRunSpeed(next)
+        }}
+        className="h-1 w-24 cursor-pointer accent-accent"
+        aria-label={`Run speed: ${speedLabel(runSpeed)} instructions per second`}
+      />
+      <span
+        className="font-mono text-[10px] tabular-nums text-ink-2"
+        style={{ letterSpacing: '0.04em', minWidth: '3.5ch' }}
+      >
+        {speedLabel(runSpeed)}
+      </span>
+    </div>
+  )
+}
 
 const EXAMPLES: ReadonlyArray<{ id: ExampleName; label: string; desc: string }> = [
   { id: 'arraySum',    label: 'Array Sum',         desc: 'sum the elements of an int array' },
@@ -147,17 +187,20 @@ export function Toolbar() {
   const run           = useSimulator((s) => s.run)
   const step          = useSimulator((s) => s.step)
   const reset         = useSimulator((s) => s.reset)
+  const pause         = useSimulator((s) => s.pause)
   const newFile       = useSimulator((s) => s.newFile)
   const openFromDisk  = useSimulator((s) => s.openFromDisk)
   const saveActive    = useSimulator((s) => s.saveActive)
   const saveAll       = useSimulator((s) => s.saveAll)
   const files         = useSimulator((s) => s.files)
   const activeFileId  = useSimulator((s) => s.activeFileId)
+  const status        = useSimulator((s) => s.status)
 
   const noSource         = source.length === 0
   const activeFile       = files.find((f) => f.id === activeFileId)
   const canSaveActive    = activeFile !== undefined
   const canSaveAll       = files.some((f) => f.modified && f.handle !== null)
+  const canPause         = status === 'running'
 
   return (
     <div
@@ -212,7 +255,16 @@ export function Toolbar() {
         >
           Run
         </Button>
-        <PlaceholderButton label="Pause"        title="Pause (F6) — wired in SA-10" />
+        <Button
+          variant="ghost"
+          disabled={!canPause}
+          aria-disabled={!canPause}
+          onClick={pause}
+          title="Pause (F6 — keybinding wires in SA-14)"
+          className="px-2 py-1 text-xs"
+        >
+          Pause
+        </Button>
         <Button
           variant="ghost"
           disabled={noSource}
@@ -237,20 +289,8 @@ export function Toolbar() {
 
       <Divider />
 
-      {/* Speed slider — wired in SA-10. Visual placeholder for now. */}
-      <div className="flex items-center gap-2 text-xs text-ink-3" aria-label="Run speed">
-        <span style={{ letterSpacing: '0.04em' }}>Speed</span>
-        <input
-          type="range"
-          min={0}
-          max={7}
-          defaultValue={7}
-          disabled
-          className="h-1 w-24 cursor-not-allowed accent-accent opacity-50"
-          aria-label="Run speed (wired in SA-10)"
-        />
-        <span className="font-mono text-[10px]">∞</span>
-      </div>
+      {/* Speed slider — wired to runSpeed (SA-10). */}
+      <SpeedSlider />
 
       {/* Right side: spacer pushes StatusPill to the far edge. */}
       <span className="flex-1" aria-hidden="true" />
