@@ -297,7 +297,9 @@ interface SimulatorStoreState {
   openFromDisk: () => Promise<void>
   saveActive: () => Promise<void>
   saveActiveAs: () => Promise<void>
+  saveAll: () => Promise<void>
   closeFile: (id: string) => Promise<void>
+  closeAll: () => Promise<void>
   setActiveFile: (id: string) => void
   loadFromExample: (name: ExampleName) => void
 }
@@ -493,6 +495,23 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       }))
     },
 
+    saveAll: async () => {
+      // Only saves files that are modified AND have a handle. Files
+      // without a handle would each prompt for a destination — that's
+      // an "save each manually" flow, not a Save All.
+      const candidates = get().files.filter((f) => f.modified && f.handle)
+      if (candidates.length === 0) return
+      for (const f of candidates) {
+        await writeFileToDisk({ name: f.name, source: f.source, handle: f.handle })
+      }
+      const savedIds = new Set(candidates.map((f) => f.id))
+      set((curr) => ({
+        files: curr.files.map((f) =>
+          savedIds.has(f.id) ? { ...f, modified: false } : f,
+        ),
+      }))
+    },
+
     closeFile: async (id) => {
       const s = get()
       const target = s.files.find((f) => f.id === id)
@@ -525,6 +544,13 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         return
       }
       set({ files: remaining, activeFileId: next.id, source: next.source })
+    },
+
+    closeAll: async () => {
+      const ids = get().files.map((f) => f.id)
+      for (const id of ids) {
+        await get().closeFile(id)
+      }
     },
 
     setActiveFile: (id) => {

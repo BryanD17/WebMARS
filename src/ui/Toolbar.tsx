@@ -4,8 +4,7 @@ import { StatusPill } from './StatusPill.tsx'
 import { cn } from './cn.ts'
 
 // Disabled-placeholder button used for actions wired in later
-// sub-agents (file ops → SA-2, edit ops → SA-4 when Monaco lands,
-// run-loop ops → SA-10).
+// sub-agents (edit ops → SA-4 when Monaco lands, run-loop ops → SA-10).
 function PlaceholderButton({ label, title }: { label: string; title: string }) {
   return (
     <button
@@ -22,18 +21,60 @@ function PlaceholderButton({ label, title }: { label: string; title: string }) {
   )
 }
 
+// File-op toolbar button — same visual as Button ghost variant but
+// tighter (toolbar density). Used by the file group: New / Open /
+// Save / Save All.
+function FileOpButton({
+  label,
+  title,
+  onClick,
+  disabled,
+}: {
+  label: string
+  title: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'rounded-sm px-2 py-1 text-xs font-medium transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+        disabled
+          ? 'cursor-not-allowed bg-surface-2 text-ink-3'
+          : 'bg-surface-2 text-ink-1 hover:bg-surface-3',
+      )}
+    >
+      {label}
+    </button>
+  )
+}
+
 function Divider() {
   return <span aria-hidden="true" className="mx-1 h-6 w-px bg-divider" />
 }
 
 export function Toolbar() {
-  const source   = useSimulator((s) => s.source)
-  const assemble = useSimulator((s) => s.assemble)
-  const run      = useSimulator((s) => s.run)
-  const step     = useSimulator((s) => s.step)
-  const reset    = useSimulator((s) => s.reset)
+  const source        = useSimulator((s) => s.source)
+  const assemble      = useSimulator((s) => s.assemble)
+  const run           = useSimulator((s) => s.run)
+  const step          = useSimulator((s) => s.step)
+  const reset         = useSimulator((s) => s.reset)
+  const newFile       = useSimulator((s) => s.newFile)
+  const openFromDisk  = useSimulator((s) => s.openFromDisk)
+  const saveActive    = useSimulator((s) => s.saveActive)
+  const saveAll       = useSimulator((s) => s.saveAll)
+  const files         = useSimulator((s) => s.files)
+  const activeFileId  = useSimulator((s) => s.activeFileId)
 
-  const noSource = source.length === 0
+  const noSource         = source.length === 0
+  const activeFile       = files.find((f) => f.id === activeFileId)
+  const canSaveActive    = activeFile !== undefined
+  const canSaveAll       = files.some((f) => f.modified && f.handle !== null)
 
   return (
     <div
@@ -41,12 +82,12 @@ export function Toolbar() {
       aria-label="Primary toolbar"
       className="flex h-11 items-center gap-1 overflow-x-auto border-b border-divider bg-surface-1 px-3"
     >
-      {/* File ops — wired in SA-2 */}
+      {/* File ops — wired to the file slice (SA-2 commit 2). */}
       <div className="flex items-center gap-1" aria-label="File operations">
-        <PlaceholderButton label="New"       title="New file (Ctrl+N) — wired in SA-2" />
-        <PlaceholderButton label="Open"      title="Open file (Ctrl+O) — wired in SA-2" />
-        <PlaceholderButton label="Save"      title="Save (Ctrl+S) — wired in SA-2" />
-        <PlaceholderButton label="Save All"  title="Save All — wired in SA-2" />
+        <FileOpButton label="New"      title="New file (Ctrl+N — keybinding wires in SA-14)"        onClick={newFile} />
+        <FileOpButton label="Open"     title="Open file (Ctrl+O — keybinding wires in SA-14)"       onClick={() => { void openFromDisk() }} />
+        <FileOpButton label="Save"     title="Save active file (Ctrl+S — keybinding wires in SA-14)" onClick={() => { void saveActive() }}    disabled={!canSaveActive} />
+        <FileOpButton label="Save All" title="Save every modified file with a stored handle"         onClick={() => { void saveAll() }}        disabled={!canSaveAll} />
       </div>
 
       <Divider />

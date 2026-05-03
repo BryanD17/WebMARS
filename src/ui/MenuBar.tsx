@@ -25,21 +25,28 @@ function buildMenus(actions: {
   toggleLeftRail: () => void
   toggleRightPanel: () => void
   toggleBottomPanel: () => void
+  newFile: () => void
+  openFromDisk: () => Promise<void>
+  saveActive: () => Promise<void>
+  saveActiveAs: () => Promise<void>
+  saveAll: () => Promise<void>
+  closeActive: () => Promise<void>
+  closeAll: () => Promise<void>
 }): ReadonlyArray<MenuDef> {
   return [
   {
     label: 'File',
     items: [
-      { kind: 'action', label: 'New File',         shortcut: 'Ctrl+N',       disabled: true },
-      { kind: 'action', label: 'Open…',            shortcut: 'Ctrl+O',       disabled: true },
+      { kind: 'action', label: 'New File',         shortcut: 'Ctrl+N',       onClick: actions.newFile },
+      { kind: 'action', label: 'Open…',            shortcut: 'Ctrl+O',       onClick: () => { void actions.openFromDisk() } },
       { kind: 'separator' },
-      { kind: 'action', label: 'Save',             shortcut: 'Ctrl+S',       disabled: true },
-      { kind: 'action', label: 'Save As…',         shortcut: 'Ctrl+Shift+S', disabled: true },
-      { kind: 'action', label: 'Save All',                                   disabled: true },
+      { kind: 'action', label: 'Save',             shortcut: 'Ctrl+S',       onClick: () => { void actions.saveActive() } },
+      { kind: 'action', label: 'Save As…',         shortcut: 'Ctrl+Shift+S', onClick: () => { void actions.saveActiveAs() } },
+      { kind: 'action', label: 'Save All',                                   onClick: () => { void actions.saveAll() } },
       { kind: 'separator' },
       { kind: 'action', label: 'Open Recent',                                disabled: true },
-      { kind: 'action', label: 'Close',            shortcut: 'Ctrl+W',       disabled: true },
-      { kind: 'action', label: 'Close All',                                  disabled: true },
+      { kind: 'action', label: 'Close',            shortcut: 'Ctrl+W',       onClick: () => { void actions.closeActive() } },
+      { kind: 'action', label: 'Close All',                                  onClick: () => { void actions.closeAll() } },
     ],
   },
   {
@@ -119,10 +126,39 @@ export function MenuBar() {
   const toggleLeftRail    = useSimulator((s) => s.toggleLeftRail)
   const toggleRightPanel  = useSimulator((s) => s.toggleRightPanel)
   const toggleBottomPanel = useSimulator((s) => s.toggleBottomPanel)
+  const newFile           = useSimulator((s) => s.newFile)
+  const openFromDisk      = useSimulator((s) => s.openFromDisk)
+  const saveActive        = useSimulator((s) => s.saveActive)
+  const saveActiveAs      = useSimulator((s) => s.saveActiveAs)
+  const saveAll           = useSimulator((s) => s.saveAll)
+  const closeFile         = useSimulator((s) => s.closeFile)
+  const closeAll          = useSimulator((s) => s.closeAll)
+  const activeFileId      = useSimulator((s) => s.activeFileId)
+
+  const closeActive = async (): Promise<void> => {
+    if (activeFileId !== null) await closeFile(activeFileId)
+  }
 
   const menus = useMemo(
-    () => buildMenus({ toggleLeftRail, toggleRightPanel, toggleBottomPanel }),
-    [toggleLeftRail, toggleRightPanel, toggleBottomPanel],
+    () =>
+      buildMenus({
+        toggleLeftRail,
+        toggleRightPanel,
+        toggleBottomPanel,
+        newFile,
+        openFromDisk,
+        saveActive,
+        saveActiveAs,
+        saveAll,
+        closeActive,
+        closeAll,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      toggleLeftRail, toggleRightPanel, toggleBottomPanel,
+      newFile, openFromDisk, saveActive, saveActiveAs, saveAll,
+      activeFileId, closeFile, closeAll,
+    ],
   )
 
   // Click outside or Escape closes the open menu.
