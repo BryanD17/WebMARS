@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import { MenuBar } from './MenuBar.tsx'
 import { Toolbar } from './Toolbar.tsx'
@@ -17,6 +18,25 @@ import { DevPanel } from './DevPanel.tsx'
 export function Shell() {
   const rightPanelOpen   = useSimulator((s) => s.rightPanelOpen)
   const bottomPanelOpen  = useSimulator((s) => s.bottomPanelOpen)
+
+  // Block accidental tab close / reload when any file is modified.
+  // Reads state imperatively via getState() so the effect doesn't
+  // re-bind on every file change (the listener is registered once,
+  // checks the latest state when triggered).
+  useEffect(() => {
+    function handler(event: BeforeUnloadEvent) {
+      const dirty = useSimulator.getState().files.some((f) => f.modified)
+      if (!dirty) return
+      event.preventDefault()
+      // Browser-displayed message is no longer customizable for
+      // security reasons; setting returnValue is what triggers the
+      // legacy "leave site?" prompt in older Chromium / Safari.
+      event.returnValue = ''
+      return ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
 
   const workspaceCols = rightPanelOpen
     ? 'grid-cols-[auto_1fr_360px]'
