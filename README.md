@@ -49,31 +49,50 @@ To run the project locally for development, follow the instructions below.
 
 - Node.js 20 or later.
 - npm 10 or later. Yarn and pnpm are also supported but not officially tested.
+- A Chromium-based browser (Chrome, Edge, Brave, Arc) for the full feature set. Firefox works but falls back to download-based saves because the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) is Chromium-only.
 
 ### Installation
 
-```bash
-git clone https://github.com/<your-org>/webmars.git
-cd webmars
+```powershell
+git clone https://github.com/BryanD17/WebMARS.git
+cd WebMARS
 npm install
 ```
 
+### Verify the install
+
+```powershell
+npm test
+```
+
+You should see all tests passing (currently 103). If they don't, the local checkout is broken — fix that before continuing.
+
 ### Running the development server
 
-```bash
+```powershell
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173` by default.
+Vite prints the local URL it picked. By default that is `http://localhost:5173`, but Vite will fall through to `5174`, `5175`, … if 5173 is already in use (a previous dev server, another project), so always read the URL Vite prints rather than assuming the default.
+
+Saving a source file in `src/` triggers an HMR reload in the open browser tab — most edits land in well under a second.
 
 ### Building for production
 
-```bash
+```powershell
 npm run build
 npm run preview
 ```
 
-The build output is written to `dist/` and can be served by any static host.
+The build output is written to `dist/` and can be served by any static host. `npm run preview` serves that same output locally so you can spot-check the production bundle before deploying. Vercel deploys from the same `npm run build` step — see [`docs/VERCEL_DEPLOY.md`](./docs/VERCEL_DEPLOY.md).
+
+### Other useful scripts
+
+```powershell
+npm run typecheck     # strict TypeScript check, no emit
+npm run lint          # ESLint across src/ and tests/
+npm run test:watch    # vitest in watch mode
+```
 
 ## Usage
 
