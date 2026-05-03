@@ -27,7 +27,7 @@ export function StatusBar() {
 
   return (
     <footer
-      className="grid h-8 grid-cols-[auto_1fr_auto] items-center border-t border-divider bg-surface-1 font-mono text-xs uppercase"
+      className="grid h-6 grid-cols-[auto_1fr_auto] items-center border-t border-divider bg-surface-1 font-mono text-xs uppercase"
     >
       {/* Left: current sim status */}
       <span
