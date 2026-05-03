@@ -38,6 +38,8 @@ const MNEMONICS = [
   'c.eq.s', 'c.lt.s', 'c.le.s',
   'bc1f', 'bc1t',
   'mtc1', 'mfc1', 'lwc1', 'swc1',
+  // Trap instructions — Phase 2F.
+  'teq', 'tne', 'tlt', 'tltu', 'tge', 'tgeu',
 ] as const
 
 const DIRECTIVES = [
@@ -145,6 +147,15 @@ const INSTRUCTION_REFERENCE: Record<string, InstructionRef> = {
   'mfc1':   { signature: 'mfc1 $rt, $fs',        desc: 'Move word from FPR to GPR. $rt ← bits($fs) (sign-extended).' },
   'lwc1':   { signature: 'lwc1 $ft, offset($rs)',desc: 'Load word into FPR. $ft = MEM[$rs + offset]. Address must be 4-byte aligned.' },
   'swc1':   { signature: 'swc1 $ft, offset($rs)',desc: 'Store word from FPR. MEM[$rs + offset] = $ft. Address must be 4-byte aligned.' },
+
+  // Trap instructions — Phase 2F. Each compares $rs against $rt and
+  // raises a runtime trap when its condition holds.
+  teq:  { signature: 'teq $rs, $rt',  desc: 'Trap if equal. Raises a runtime error when $rs == $rt.' },
+  tne:  { signature: 'tne $rs, $rt',  desc: 'Trap if not equal. Raises a runtime error when $rs != $rt.' },
+  tlt:  { signature: 'tlt $rs, $rt',  desc: 'Trap if less than (signed). Raises when $rs < $rt.' },
+  tltu: { signature: 'tltu $rs, $rt', desc: 'Trap if less than (unsigned). Raises when $rs <u $rt.' },
+  tge:  { signature: 'tge $rs, $rt',  desc: 'Trap if greater or equal (signed). Raises when $rs >= $rt.' },
+  tgeu: { signature: 'tgeu $rs, $rt', desc: 'Trap if greater or equal (unsigned). Raises when $rs >=u $rt.' },
 }
 
 const monarchTokens: languages.IMonarchLanguage = {

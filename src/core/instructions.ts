@@ -495,6 +495,17 @@ export function assemble(source: string): AssembledProgram {
           }
           case 'nop': instr = 0; consumed = 0; break;
 
+          // ─ Phase 2F — trap instructions ─
+          // Two-operand R-type: teq $rs, $rt → rType(0, rs=getR(0),
+          // rt=getR(2), rd=0, shamt=0, funct=0x34). Code in bits
+          // 15:6 (rd+shamt) is unused — set to 0.
+          case 'teq':  instr = rType(0, getR(0), getR(2), 0, 0, 0x34); consumed = 3; break;
+          case 'tne':  instr = rType(0, getR(0), getR(2), 0, 0, 0x36); consumed = 3; break;
+          case 'tlt':  instr = rType(0, getR(0), getR(2), 0, 0, 0x32); consumed = 3; break;
+          case 'tltu': instr = rType(0, getR(0), getR(2), 0, 0, 0x33); consumed = 3; break;
+          case 'tge':  instr = rType(0, getR(0), getR(2), 0, 0, 0x30); consumed = 3; break;
+          case 'tgeu': instr = rType(0, getR(0), getR(2), 0, 0, 0x31); consumed = 3; break;
+
           // ─ Coprocessor 1 (FPU) ─
           // The FPU encoding reuses the rType field layout: cop1 op
           // 0x11, with rs slot = fmt (0x10 for .s, 0x14 for .w),

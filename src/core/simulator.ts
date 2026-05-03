@@ -255,6 +255,16 @@ export class Simulator {
           if (syscallCode === 10) this.halted = true
           break
         }
+        // ─ Phase 2F — trap instructions ─
+        // Each fires a runtime trap (modeled as a thrown error) when
+        // its condition holds. The message names the mnemonic + the
+        // operand values so the runtime panel can show what tripped.
+        case 0x30: if (toSigned32(this.r(rs)) >= toSigned32(this.r(rt))) throw new Error(`Trap: tge ($${rs}=${this.r(rs)}) >= ($${rt}=${this.r(rt)})`); break
+        case 0x31: if (toUnsigned32(this.r(rs)) >= toUnsigned32(this.r(rt))) throw new Error(`Trap: tgeu ($${rs}=${this.r(rs) >>> 0}) >= ($${rt}=${this.r(rt) >>> 0})`); break
+        case 0x32: if (toSigned32(this.r(rs)) <  toSigned32(this.r(rt))) throw new Error(`Trap: tlt ($${rs}=${this.r(rs)}) < ($${rt}=${this.r(rt)})`); break
+        case 0x33: if (toUnsigned32(this.r(rs)) <  toUnsigned32(this.r(rt))) throw new Error(`Trap: tltu ($${rs}=${this.r(rs) >>> 0}) < ($${rt}=${this.r(rt) >>> 0})`); break
+        case 0x34: if (this.r(rs) === this.r(rt)) throw new Error(`Trap: teq ($${rs}=${this.r(rs)}) == ($${rt}=${this.r(rt)})`); break
+        case 0x36: if (this.r(rs) !== this.r(rt)) throw new Error(`Trap: tne ($${rs}=${this.r(rs)}) != ($${rt}=${this.r(rt)})`); break
         default:
           throw new Error(`Unknown R-type funct: 0x${funct.toString(16)}`)
       }
