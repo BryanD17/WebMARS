@@ -290,6 +290,19 @@ export interface BottomMessage {
   line?: number          // optional source line for click-to-jump
 }
 
+// ─ console input ─
+
+export type PendingInputKind = 'int' | 'string' | 'char'
+
+export interface PendingInput {
+  kind: PendingInputKind
+  maxLen?: number                       // for readString (syscall 8)
+  // resolve is called with the raw user input; resolveError triggers
+  // a re-prompt without resolving the underlying Promise (used for
+  // invalid integer input — the program is still waiting).
+  resolve: (raw: string) => void
+}
+
 const MAX_MESSAGES = 200
 
 function makeMessageId(): string {
@@ -347,6 +360,10 @@ interface SimulatorStoreState {
   clearConsole: () => void
   setConsoleFilter: (next: string) => void
 
+  // ─ console input slice (additive; not persisted — session state) ─
+  pendingInput: PendingInput | null
+  submitInput: (raw: string) => void
+
   // ─ file slice (additive; recents persisted to webmars:recent-files) ─
   files: FileEntry[]
   activeFileId: string | null
@@ -374,9 +391,47 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       print: (s) => {
         set((state) => ({ consoleOutput: [...state.consoleOutput, s] }))
       },
-      // I/O syscalls (5, 8) stubbed — full console wiring is a Day 5 task.
-      readInt: () => Promise.resolve(0),
-      readString: () => Promise.resolve(''),
+      // syscall 5 — readInt. Suspends the simulator behind a Promise
+      // that the UI's submitInput action resolves with a parsed int.
+      // Invalid input re-prompts (PendingInput stays set; the
+      // submitInput handler doesn't resolve until parse succeeds).
+      readInt: () =>
+        new Promise<number>((resolve) => {
+          set({
+            status: 'paused',
+            pendingInput: {
+              kind: 'int',
+              resolve: (raw) => {
+                const n = parseInt(raw.trim(), 10)
+                if (Number.isNaN(n)) {
+                  // Don't clear pendingInput — the input field will
+                  // re-prompt with a validation hint via the UI.
+                  return
+                }
+                set({ pendingInput: null, status: 'running' })
+                resolve(n)
+              },
+            },
+          })
+          get().logMessage('info', 'Awaiting input: integer (syscall 5)')
+        }),
+
+      // syscall 8 — readString. The engine passes maxLen via the
+      // SyscallIO contract; UI truncates to that length on submit.
+      readString: (maxLen?: number) =>
+        new Promise<string>((resolve) => {
+          const pending: PendingInput = {
+            kind: 'string',
+            resolve: (raw) => {
+              set({ pendingInput: null, status: 'running' })
+              resolve(raw)
+            },
+            ...(typeof maxLen === 'number' ? { maxLen } : {}),
+          }
+          set({ status: 'paused', pendingInput: pending })
+          get().logMessage('info', 'Awaiting input: string (syscall 8)')
+        }),
+
       exit: () => {
         _stopFlag = true
       },
@@ -487,6 +542,20 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     clearConsole: () => set({ consoleOutput: [] }),
 
     setConsoleFilter: (next) => set({ consoleFilter: next }),
+
+    // console input slice
+    pendingInput: null,
+
+    submitInput: (raw) => {
+      const pending = get().pendingInput
+      if (!pending) return
+      // For string inputs respect maxLen if set.
+      if (pending.kind === 'string' && typeof pending.maxLen === 'number') {
+        pending.resolve(raw.slice(0, pending.maxLen))
+        return
+      }
+      pending.resolve(raw)
+    },
 
     setSource: (next) => set((s) => ({
       source: next,
@@ -813,6 +882,11 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         consoleOutput: [],
         assemblerErrors: [],
         runtimeError: null,
+        // Discarding any pending input — the program isn't waiting
+        // anymore. The dangling Promise from readInt/readString never
+        // resolves (the simulator was reset out from under it); GC
+        // collects when references drop.
+        pendingInput: null,
       })
       _stopFlag = false
     },
