@@ -775,6 +775,45 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           get().logMessage('info', 'Awaiting input: string (syscall 8)')
         }),
 
+      // syscall 12 — readChar. Reuses the pendingInput infrastructure
+      // with kind 'char'; ConsoleInputField clamps to a single char.
+      readChar: () =>
+        new Promise<string>((resolve) => {
+          set({
+            status: 'paused',
+            pendingInput: {
+              kind: 'char',
+              resolve: (raw) => {
+                set({ pendingInput: null, status: 'running' })
+                resolve(raw.length > 0 ? raw[0]! : '')
+              },
+            },
+          })
+          get().logMessage('info', 'Awaiting input: character (syscall 12)')
+        }),
+
+      // syscall 50 — confirm dialog. Native window.confirm only
+      // returns OK/Cancel (boolean), so we collapse the MARS
+      // 3-state response: OK → Yes (0), Cancel → No (1). Real Cancel
+      // (2) is unreachable until we build a custom 3-button modal.
+      confirm: (message) =>
+        Promise.resolve(
+          typeof window !== 'undefined' && window.confirm(message) ? 0 : 1,
+        ),
+
+      // syscall 54 — message dialog. Native window.alert prefixed
+      // with the message kind so the user sees the severity. A
+      // custom modal with iconography would be a future polish.
+      alert: (message, kind) => {
+        const prefix =
+          kind === 'warn'    ? '[Warning] '
+          : kind === 'error' ? '[Error] '
+          : kind === 'question' ? '[?] '
+          : ''
+        if (typeof window !== 'undefined') window.alert(prefix + message)
+        return Promise.resolve()
+      },
+
       exit: () => {
         _stopFlag = true
       },
