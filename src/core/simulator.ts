@@ -67,6 +67,10 @@ export class Simulator {
     if (!on) this.pendingBranchTarget = null
   }
 
+  setAllowSelfModifyingCode(on: boolean): void {
+    this.memory.setAllowTextWrites(on)
+  }
+
   // Branch/jump dispatch. Called from execute(); routes through
   // pendingBranchTarget when delayed branching is on so the next
   // step()'s instruction (the delay slot) runs before the target

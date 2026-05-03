@@ -8,10 +8,20 @@ export const MEM_SIZE   = 0x00800000;
 export class Memory {
   private buf: ArrayBuffer;
   private view: DataView;
+  // Phase 2D — when false (default), stores to addresses in the
+  // .text segment throw. Real MARS rejects self-modifying code by
+  // default; flipping this on lets advanced examples patch the
+  // instruction stream at runtime. Program-loader writes go through
+  // loadProgram() which bypasses the guard.
+  private allowTextWrites: boolean = false;
 
   constructor() {
     this.buf = new ArrayBuffer(MEM_SIZE);
     this.view = new DataView(this.buf);
+  }
+
+  setAllowTextWrites(on: boolean): void {
+    this.allowTextWrites = on;
   }
 
   private offset(addr: number): number {
@@ -22,6 +32,17 @@ export class Memory {
     throw new Error(`Memory access out of range: 0x${a.toString(16)}`);
   }
 
+  private guardWrite(addr: number): void {
+    const a = toUnsigned32(addr);
+    if (this.allowTextWrites) return;
+    if (a >= TEXT_BASE && a < TEXT_BASE + 0x00100000) {
+      throw new Error(
+        `Self-modifying code: store to .text at 0x${a.toString(16)}. ` +
+        `Enable Settings → Simulator → "Self-modifying code allowed" to permit.`,
+      );
+    }
+  }
+
   readWord(addr: number): number {
     if (addr & 3) throw new Error(`Unaligned word read at 0x${toUnsigned32(addr).toString(16)}`);
     return this.view.getInt32(this.offset(addr), false);
@@ -29,6 +50,7 @@ export class Memory {
 
   writeWord(addr: number, val: number): void {
     if (addr & 3) throw new Error(`Unaligned word write at 0x${toUnsigned32(addr).toString(16)}`);
+    this.guardWrite(addr);
     this.view.setInt32(this.offset(addr), val, false);
   }
 
@@ -39,6 +61,7 @@ export class Memory {
 
   writeHalf(addr: number, val: number): void {
     if (addr & 1) throw new Error(`Unaligned halfword write`);
+    this.guardWrite(addr);
     this.view.setInt16(this.offset(addr), val & 0xffff, false);
   }
 
@@ -47,6 +70,7 @@ export class Memory {
   }
 
   writeByte(addr: number, val: number): void {
+    this.guardWrite(addr);
     this.view.setInt8(this.offset(addr), val & 0xff);
   }
 

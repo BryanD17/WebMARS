@@ -1058,11 +1058,15 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const next = { ...get().simSettings, [key]: value }
       set({ simSettings: next })
       writePersistedSimSettings(next)
-      // Phase 2C — propagate delayedBranching to the live simulator
-      // so the change takes effect mid-program. The flag is also
-      // re-applied at assemble time so a fresh sim picks it up.
+      // Phase 2C/2D — propagate engine-affecting toggles to the live
+      // simulator so the change takes effect mid-program. The flags
+      // are also re-applied at assemble time so a fresh sim picks
+      // them up.
       if (key === 'delayedBranching' && _sim) {
         _sim.setDelayedBranching(value as boolean)
+      }
+      if (key === 'selfModifyingCode' && _sim) {
+        _sim.setAllowSelfModifyingCode(value as boolean)
       }
     },
 
@@ -1354,7 +1358,9 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       clearHistory()
       const sim = makeSim()
       sim.load(program)
-      sim.setDelayedBranching(get().simSettings.delayedBranching)
+      const settings = get().simSettings
+      sim.setDelayedBranching(settings.delayedBranching)
+      sim.setAllowSelfModifyingCode(settings.selfModifyingCode)
       patchMemoryForBackstep(sim)
       const engineState = sim.getState()
       const fpuState = sim.getFpuState()

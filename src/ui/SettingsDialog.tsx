@@ -267,8 +267,6 @@ export function SettingsDialog() {
                     description="Permit stores to the .text segment. Off by default — most programs hit this by accident."
                     checked={simSettings.selfModifyingCode}
                     onChange={(v) => setSimSetting('selfModifyingCode', v)}
-                    badge="Phase 2D"
-                    disabled
                   />
                 </Section>
                 <Section title="Notes">
