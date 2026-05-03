@@ -290,6 +290,62 @@ export interface BottomMessage {
   line?: number          // optional source line for click-to-jump
 }
 
+// ─ memory inspector ─
+
+export type MemoryViewSegment = 'text' | 'data' | 'stack'
+
+// Default base addresses per segment — match Zach's engine constants
+// in src/core/memory.ts (TEXT_BASE / DATA_BASE / STACK_BASE).
+export const SEGMENT_BASES: Record<MemoryViewSegment, number> = {
+  text:  0x00400000,
+  data:  0x10010000,
+  // Stack grows down from here — show the 32 words BELOW STACK_BASE
+  // so the most recent pushes are visible at the top.
+  stack: 0x7fffefe0,
+}
+
+const MEMORY_WINDOW_WORDS = 64   // 8 rows × 8 words per row
+
+const MEMORY_VIEW_STORAGE_KEY = 'webmars:memory-view'
+const MEMORY_VIEW_SEGMENTS: ReadonlyArray<MemoryViewSegment> = ['text', 'data', 'stack']
+
+interface PersistedMemoryView {
+  segment: MemoryViewSegment
+  base: number
+}
+
+function readPersistedMemoryView(): PersistedMemoryView {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(MEMORY_VIEW_STORAGE_KEY)
+    if (raw === null) return { segment: 'data', base: SEGMENT_BASES.data }
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) {
+      return { segment: 'data', base: SEGMENT_BASES.data }
+    }
+    const obj = parsed as Record<string, unknown>
+    const segment: MemoryViewSegment =
+      typeof obj.segment === 'string' && (MEMORY_VIEW_SEGMENTS as ReadonlyArray<string>).includes(obj.segment)
+        ? (obj.segment as MemoryViewSegment)
+        : 'data'
+    const base: number =
+      typeof obj.base === 'number' && Number.isFinite(obj.base)
+        ? obj.base >>> 0
+        : SEGMENT_BASES[segment]
+    return { segment, base }
+  } catch {
+    return { segment: 'data', base: SEGMENT_BASES.data }
+  }
+}
+
+function writePersistedMemoryView(view: PersistedMemoryView): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(MEMORY_VIEW_STORAGE_KEY, JSON.stringify(view))
+  } catch {
+    // ignore
+  }
+}
+
 // ─ console input ─
 
 export type PendingInputKind = 'int' | 'string' | 'char'
@@ -363,6 +419,16 @@ interface SimulatorStoreState {
   // ─ console input slice (additive; not persisted — session state) ─
   pendingInput: PendingInput | null
   submitInput: (raw: string) => void
+
+  // ─ memory inspector slice (additive; segment + base persisted) ─
+  memoryViewSegment: MemoryViewSegment
+  memoryViewBase: number
+  memoryWords: ReadonlyArray<{ addr: number; word: number }>
+  memoryChanged: ReadonlySet<number>
+  setMemoryViewSegment: (segment: MemoryViewSegment) => void
+  setMemoryViewBase: (addr: number) => void
+  refreshMemorySnapshot: () => void
+  writeMemoryWord: (addr: number, value: number) => boolean
 
   // ─ file slice (additive; recents persisted to webmars:recent-files) ─
   files: FileEntry[]
@@ -555,6 +621,70 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         return
       }
       pending.resolve(raw)
+    },
+
+    // memory inspector slice
+    memoryViewSegment: readPersistedMemoryView().segment,
+    memoryViewBase:    readPersistedMemoryView().base,
+    memoryWords:       [],
+    memoryChanged:     new Set<number>(),
+
+    setMemoryViewSegment: (segment) => {
+      const base = SEGMENT_BASES[segment]
+      set({ memoryViewSegment: segment, memoryViewBase: base, memoryChanged: new Set<number>() })
+      writePersistedMemoryView({ segment, base })
+      get().refreshMemorySnapshot()
+    },
+
+    setMemoryViewBase: (addr) => {
+      // Word-align: round down to nearest 4 bytes.
+      const aligned = (addr & ~0x3) >>> 0
+      set({ memoryViewBase: aligned })
+      writePersistedMemoryView({ segment: get().memoryViewSegment, base: aligned })
+      get().refreshMemorySnapshot()
+    },
+
+    refreshMemorySnapshot: () => {
+      if (!_sim) {
+        // No active simulator — clear the snapshot so the panel
+        // shows empty rows rather than stale data from a prior
+        // assemble.
+        set({ memoryWords: [], memoryChanged: new Set<number>() })
+        return
+      }
+      const base = get().memoryViewBase
+      const next = _sim.memoryDump(base, MEMORY_WINDOW_WORDS)
+      const prev = get().memoryWords
+      const prevByAddr = new Map<number, number>()
+      for (const entry of prev) prevByAddr.set(entry.addr, entry.word)
+      const changed = new Set<number>()
+      for (const entry of next) {
+        const old = prevByAddr.get(entry.addr)
+        if (old !== undefined && old !== entry.word) {
+          changed.add(entry.addr)
+        }
+      }
+      set({ memoryWords: next, memoryChanged: changed })
+    },
+
+    writeMemoryWord: (addr, value) => {
+      if (!_sim) return false
+      const aligned = (addr & ~0x3) >>> 0
+      try {
+        _sim.memoryDump(aligned, 1)   // throws if address is unmapped
+      } catch {
+        return false
+      }
+      // Memory is mutated in place via the engine instance —
+      // refreshMemorySnapshot picks up the new value.
+      try {
+        const memory = (_sim as unknown as { memory: { writeWord: (a: number, v: number) => void } }).memory
+        memory.writeWord(aligned, value | 0)
+      } catch {
+        return false
+      }
+      get().refreshMemorySnapshot()
+      return true
     },
 
     setSource: (next) => set((s) => ({
@@ -811,6 +941,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         runtimeError: null,
       })
       get().logMessage('info', `Assembled successfully: ${program.instructions.length} instructions.`)
+      get().refreshMemorySnapshot()
     },
 
     step: () => {
@@ -826,6 +957,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
             status: sim.isHalted() ? 'halted' : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
           })
+          get().refreshMemorySnapshot()
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : String(e)
           set({
@@ -859,6 +991,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
             status: sim.isHalted() ? 'halted' : _stopFlag ? 'paused' : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
           })
+          get().refreshMemorySnapshot()
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : String(e)
           set({
