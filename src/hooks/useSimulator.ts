@@ -301,6 +301,7 @@ interface SimulatorStoreState {
   closeFile: (id: string) => Promise<void>
   closeAll: () => Promise<void>
   setActiveFile: (id: string) => void
+  reorderFiles: (fromIndex: number, toIndex: number) => void
   loadFromExample: (name: ExampleName) => void
 }
 
@@ -558,6 +559,25 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const target = s.files.find((f) => f.id === id)
       if (!target) return
       set({ activeFileId: id, source: target.source })
+    },
+
+    reorderFiles: (fromIndex, toIndex) => {
+      set((s) => {
+        if (
+          fromIndex === toIndex ||
+          fromIndex < 0 ||
+          toIndex < 0 ||
+          fromIndex >= s.files.length ||
+          toIndex >= s.files.length
+        ) {
+          return s
+        }
+        const next = s.files.slice()
+        const [moved] = next.splice(fromIndex, 1)
+        if (!moved) return s
+        next.splice(toIndex, 0, moved)
+        return { files: next }
+      })
     },
 
     loadFromExample: (name) => {
