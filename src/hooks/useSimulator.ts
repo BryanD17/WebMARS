@@ -278,6 +278,27 @@ function makeFileId(): string {
   return `file-${Date.now()}-${Math.floor(Math.random() * 1000)}`
 }
 
+// ─ bottom-panel messages ─
+
+export type BottomMessageLevel = 'info' | 'warn' | 'error'
+
+export interface BottomMessage {
+  id: string
+  ts: number             // Date.now()
+  level: BottomMessageLevel
+  text: string
+  line?: number          // optional source line for click-to-jump
+}
+
+const MAX_MESSAGES = 200
+
+function makeMessageId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+}
+
 interface SimulatorStoreState {
   // ─ contract fields (must match src/hooks/types.ts) ─
   source: string
@@ -317,6 +338,14 @@ interface SimulatorStoreState {
   // ─ view slice (additive; persisted to webmars:number-base) ─
   numberBase: NumberBase
   setNumberBase: (base: NumberBase) => void
+
+  // ─ bottom-panel slice (additive; not persisted — session state) ─
+  messages: BottomMessage[]
+  consoleFilter: string
+  logMessage: (level: BottomMessageLevel, text: string, line?: number) => void
+  clearMessages: () => void
+  clearConsole: () => void
+  setConsoleFilter: (next: string) => void
 
   // ─ file slice (additive; recents persisted to webmars:recent-files) ─
   files: FileEntry[]
@@ -431,6 +460,33 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       set({ numberBase: base })
       writePersistedNumberBase(base)
     },
+
+    // bottom-panel slice
+    messages: [],
+    consoleFilter: '',
+
+    logMessage: (level, text, line) => {
+      const entry: BottomMessage = {
+        id: makeMessageId(),
+        ts: Date.now(),
+        level,
+        text,
+        ...(line !== undefined ? { line } : {}),
+      }
+      set((s) => ({
+        // Ring buffer: keep the most-recent MAX_MESSAGES (newer at end).
+        messages:
+          s.messages.length >= MAX_MESSAGES
+            ? [...s.messages.slice(s.messages.length - MAX_MESSAGES + 1), entry]
+            : [...s.messages, entry],
+      }))
+    },
+
+    clearMessages: () => set({ messages: [] }),
+
+    clearConsole: () => set({ consoleOutput: [] }),
+
+    setConsoleFilter: (next) => set({ consoleFilter: next }),
 
     setSource: (next) => set((s) => ({
       source: next,
@@ -658,11 +714,18 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const source = get().source
       const program = assemble(source)
       if (program.errors.length > 0) {
+        const errs = toContractErrors(program.errors)
         set({
           status: 'error',
-          assemblerErrors: toContractErrors(program.errors),
+          assemblerErrors: errs,
           runtimeError: null,
         })
+        // Log a summary; one detailed entry per error so each shows
+        // up in Messages with click-to-jump.
+        get().logMessage('error', `Assemble failed: ${errs.length} error${errs.length === 1 ? '' : 's'}.`)
+        for (const e of errs) {
+          get().logMessage('error', `Line ${e.line}: ${e.message}`, e.line)
+        }
         return
       }
       _sim = null
@@ -678,6 +741,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         assemblerErrors: [],
         runtimeError: null,
       })
+      get().logMessage('info', `Assembled successfully: ${program.instructions.length} instructions.`)
     },
 
     step: () => {
