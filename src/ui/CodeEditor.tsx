@@ -1,4 +1,6 @@
-import { Editor, type Monaco } from '@monaco-editor/react'
+import { useEffect, useRef } from 'react'
+import { Editor, type Monaco, type OnMount } from '@monaco-editor/react'
+import type { editor as monacoEditor } from 'monaco-editor'
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import { registerMips } from '@/lib/mipsLanguage.ts'
 
@@ -8,17 +10,54 @@ import { registerMips } from '@/lib/mipsLanguage.ts'
 // of those natively (line numbers, rulers, minimap, smooth cursor,
 // bracket matching, multi-cursor, find/replace, undo/redo).
 //
+// SA-4 commit 3 adds assembler error decorations via Monaco's native
+// marker API (red squiggles + overview ruler dots + hover messages).
+//
 // Source flows through the existing store contract: `source` for the
 // active file's content, `setSource(next)` for edits. Both are wired
 // to the multi-file slice from SA-2 (writes mirror to the active
 // file's entry in `files` and flip its modified flag).
 export function CodeEditor() {
-  const source    = useSimulator((s) => s.source)
-  const setSource = useSimulator((s) => s.setSource)
+  const source           = useSimulator((s) => s.source)
+  const setSource        = useSimulator((s) => s.setSource)
+  const assemblerErrors  = useSimulator((s) => s.assemblerErrors)
+
+  const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
+  const monacoRef = useRef<Monaco | null>(null)
 
   function handleBeforeMount(monaco: Monaco): void {
     registerMips(monaco)
+    monacoRef.current = monaco
   }
+
+  const handleMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor
+    monacoRef.current = monaco
+  }
+
+  // Apply / clear assembler-error markers whenever the error array
+  // changes. Monaco's setModelMarkers with an owner string makes
+  // updates atomic — passing an empty array clears just our markers
+  // without touching anything else (e.g., future runtime markers).
+  useEffect(() => {
+    const editor = editorRef.current
+    const monaco = monacoRef.current
+    if (!editor || !monaco) return
+    const model = editor.getModel()
+    if (!model) return
+
+    const markers: monacoEditor.IMarkerData[] = assemblerErrors.map((err) => ({
+      severity: monaco.MarkerSeverity.Error,
+      message: err.message,
+      startLineNumber: err.line,
+      endLineNumber:   err.line,
+      startColumn:     1,
+      endColumn:       Number.MAX_SAFE_INTEGER,
+      source:          'webmars-assembler',
+    }))
+
+    monaco.editor.setModelMarkers(model, 'webmars-assembler', markers)
+  }, [assemblerErrors])
 
   return (
     <Editor
@@ -28,6 +67,7 @@ export function CodeEditor() {
       value={source}
       onChange={(value) => setSource(value ?? '')}
       beforeMount={handleBeforeMount}
+      onMount={handleMount}
       loading={
         <div className="flex h-full items-center justify-center font-mono text-xs text-ink-3">
           Loading editor…
