@@ -327,12 +327,22 @@ export class Simulator {
     } else {
       switch (op) {
         case 0x08: this.setReg(rt, this.r(rs) + imm16s); break
-        case 0x09: this.setReg(rt, toUnsigned32(this.r(rs)) + imm16u); break
+        // ADDIU sign-extends the immediate per the MIPS spec (the
+        // "U" only means "no overflow trap"). Earlier engine builds
+        // used imm16u here, which silently corrupted any program
+        // that did `addiu $t, $t, -N` or `li $t, -N` (the latter
+        // expands to addiu when |N| < 32768).
+        case 0x09: this.setReg(rt, this.r(rs) + imm16s); break
         case 0x0c: this.setReg(rt, this.r(rs) & imm16u); break
         case 0x0d: this.setReg(rt, this.r(rs) | imm16u); break
         case 0x0e: this.setReg(rt, this.r(rs) ^ imm16u); break
         case 0x0a: this.setReg(rt, toSigned32(this.r(rs)) < imm16s ? 1 : 0); break
-        case 0x0b: this.setReg(rt, toUnsigned32(this.r(rs)) < imm16u ? 1 : 0); break
+        // SLTIU sign-extends the immediate to 32 bits, then compares
+        // both operands as unsigned integers. The previous code used
+        // imm16u (zero-extended) which made `sltiu $t, $rs, -1` flag
+        // the wrong direction — comparing against 0xffff instead of
+        // 0xffffffff.
+        case 0x0b: this.setReg(rt, toUnsigned32(this.r(rs)) < toUnsigned32(imm16s) ? 1 : 0); break
         case 0x0f: this.setReg(rt, imm16u << 16); break
         case 0x23: this.setReg(rt, this.memory.readWord(this.r(rs) + imm16s)); break
         case 0x21: this.setReg(rt, this.memory.readHalf(this.r(rs) + imm16s)); break
