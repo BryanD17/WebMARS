@@ -22,9 +22,11 @@ export function CodeEditor() {
   const source           = useSimulator((s) => s.source)
   const setSource        = useSimulator((s) => s.setSource)
   const assemblerErrors  = useSimulator((s) => s.assemblerErrors)
+  const breakpoints      = useSimulator((s) => s.breakpoints)
 
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
+  const breakpointDecorationsRef = useRef<string[]>([])
 
   function handleBeforeMount(monaco: Monaco): void {
     registerMips(monaco)
@@ -34,6 +36,20 @@ export function CodeEditor() {
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
     monacoRef.current = monaco
+
+    // Wire gutter clicks to toggle breakpoints. We pull
+    // toggleBreakpoint imperatively via getState() to avoid stale
+    // closure capture (the listener is registered once on mount;
+    // store actions are stable Zustand references but reading
+    // imperatively keeps the contract obvious).
+    editor.onMouseDown((event) => {
+      if (event.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+        const line = event.target.position?.lineNumber
+        if (typeof line === 'number') {
+          useSimulator.getState().toggleBreakpoint(line)
+        }
+      }
+    })
   }
 
   // Apply / clear assembler-error markers whenever the error array
@@ -59,6 +75,27 @@ export function CodeEditor() {
 
     monaco.editor.setModelMarkers(model, 'webmars-assembler', markers)
   }, [assemblerErrors])
+
+  // Sync breakpoint glyph decorations whenever the active file's
+  // breakpoint set changes. deltaDecorations replaces the previous
+  // batch atomically (returned IDs become the next "previous" set).
+  useEffect(() => {
+    const editor = editorRef.current
+    const monaco = monacoRef.current
+    if (!editor || !monaco) return
+
+    const next = [...breakpoints].map((line) => ({
+      range: new monaco.Range(line, 1, line, 1),
+      options: {
+        glyphMarginClassName: 'webmars-breakpoint-glyph',
+        glyphMarginHoverMessage: { value: `Breakpoint at line ${line} — click to remove` },
+      },
+    }))
+    breakpointDecorationsRef.current = editor.deltaDecorations(
+      breakpointDecorationsRef.current,
+      next,
+    )
+  }, [breakpoints])
 
   // Listen for the JUMP_TO_LINE_EVENT dispatched by Problems /
   // Messages panels — reveal the line, place the cursor at column 1

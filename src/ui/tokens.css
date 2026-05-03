@@ -69,6 +69,20 @@
   100% { background-color: transparent;   color: inherit; }
 }
 
+/* Monaco breakpoint glyph — applied to the editor's glyph margin
+   via the glyphMarginClassName decoration option. The ::before
+   renders an 8px --danger circle vertically centered in the
+   margin. */
+.webmars-breakpoint-glyph::before {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  margin: 6px auto;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
 /* ─ scrollbars ─────────────────────────────────────────────────────
    Style every scrollable surface with the same thin --surface-3 thumb
    on a transparent track so register tables, tab bodies, and the
