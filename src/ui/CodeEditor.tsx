@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Editor, type Monaco, type OnMount } from '@monaco-editor/react'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { useSimulator } from '@/hooks/useSimulator.ts'
+import { useIsMobile } from '@/hooks/useIsMobile.ts'
 import { registerMips } from '@/lib/mipsLanguage.ts'
 import { JUMP_TO_LINE_EVENT, type JumpToLineDetail } from '@/lib/jumpToLine.ts'
 import { setEditorCursorReader } from '@/lib/editorCursor.ts'
@@ -25,6 +26,7 @@ export function CodeEditor() {
   const assemblerErrors  = useSimulator((s) => s.assemblerErrors)
   const breakpoints      = useSimulator((s) => s.breakpoints)
   const editorFontSize   = useSimulator((s) => s.editorFontSize)
+  const isMobile         = useIsMobile()
 
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
@@ -143,6 +145,7 @@ export function CodeEditor() {
         // ~1.5x which keeps the gutter glyph centered as the user
         // resizes via the settings dialog.
         lineHeight: 0,
+        readOnly: isMobile,
         lineNumbers: 'on',
         rulers: [80],
         minimap: { enabled: true, side: 'right', renderCharacters: false },

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useSimulator } from '@/hooks/useSimulator.ts'
+import { useIsMobile } from '@/hooks/useIsMobile.ts'
 import { MenuBar } from './MenuBar.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TabStrip } from './TabStrip.tsx'
@@ -25,6 +26,7 @@ export function Shell() {
   const theme            = useSimulator((s) => s.theme)
   const files            = useSimulator((s) => s.files)
   const activeFileId     = useSimulator((s) => s.activeFileId)
+  const isMobile         = useIsMobile()
 
   // Apply theme via documentElement.dataset.theme. tokens.css scopes
   // light + HC overrides under [data-theme="…"] selectors so every
@@ -79,6 +81,40 @@ export function Shell() {
   const centerRows = bottomPanelOpen
     ? 'grid-rows-[1fr_auto]'
     : 'grid-rows-[1fr_28px]'
+
+  // On mobile (<768px) the shell collapses to a read-only editor +
+  // status bar. The toolbar / tab strip / panels all consume too much
+  // vertical space at phone widths to be useful, and Monaco runs in
+  // readOnly mode so write affordances would just be confusing.
+  if (isMobile) {
+    return (
+      <>
+        <div className="grid h-dvh grid-rows-[32px_36px_1fr_24px] overflow-hidden bg-surface-0 text-ink-1">
+          <header
+            className="flex items-center gap-2 border-b border-divider bg-surface-1 px-3 font-display text-xs text-ink-1"
+            style={{ letterSpacing: '0.04em' }}
+            role="banner"
+          >
+            <span aria-hidden="true" className="size-2 bg-accent" />
+            WebMARS
+            <span className="ml-2 truncate text-[10px] uppercase text-ink-3" style={{ letterSpacing: '0.06em' }}>
+              read-only mode
+            </span>
+          </header>
+          <div
+            role="status"
+            className="flex items-center gap-2 border-b border-divider bg-surface-2 px-3 text-[11px] text-ink-2"
+          >
+            <span aria-hidden="true" className="text-warn">⚠</span>
+            <span>Open in a desktop browser to edit, assemble, and run programs.</span>
+          </div>
+          <SourcePane />
+          <StatusBar />
+        </div>
+        {import.meta.env.DEV && <DevPanel />}
+      </>
+    )
+  }
 
   return (
     <>
