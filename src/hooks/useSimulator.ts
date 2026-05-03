@@ -25,6 +25,7 @@ import factorialSource   from '../examples/factorial.asm?raw'
 import stringPrintSource from '../examples/stringPrint.asm?raw'
 import sumToNSource      from '../examples/sumToN.asm?raw'
 import syscallIOSource   from '../examples/syscallIO.asm?raw'
+import floatMathSource   from '../examples/floatMath.asm?raw'
 
 // Canonical MIPS / real-MARS conventions: program text starts at
 // 0x00400000 and the stack pointer initializes at 0x7FFFEFFC (top of
@@ -211,7 +212,7 @@ function computeInitialLayout(): PersistedLayout {
 // keep reading from one place.
 
 export type ExampleName =
-  | 'arraySum' | 'factorial' | 'stringPrint' | 'sumToN' | 'syscallIO'
+  | 'arraySum' | 'factorial' | 'stringPrint' | 'sumToN' | 'syscallIO' | 'floatMath'
 
 export interface FileEntry {
   id: string
@@ -232,6 +233,7 @@ const EXAMPLE_SOURCES: Record<ExampleName, string> = {
   stringPrint: stringPrintSource,
   sumToN:      sumToNSource,
   syscallIO:   syscallIOSource,
+  floatMath:   floatMathSource,
 }
 
 const RECENT_FILES_KEY = 'webmars:recent-files'
@@ -626,6 +628,17 @@ interface SimulatorStoreState {
   toolsDialog: 'instructionCounter' | null
   openTool:  (which: 'instructionCounter') => void
   closeTool: () => void
+
+  // ─ FPU snapshot slice (Phase 2B; not persisted) ─
+  // Mirrors Simulator.getFpuState(). The 32-element values array
+  // holds raw 32-bit words; consumers reinterpret as float32 via
+  // bitsToFloat() from src/core/registers.ts. fpChanged drives the
+  // flash animation, mirroring the GPR snapshot's changed Set.
+  fpRegisters: {
+    values: number[]
+    condFlag: boolean
+    changed: ReadonlySet<number>
+  }
 }
 
 let _sim: Simulator | null = null
@@ -761,6 +774,63 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           set({ status: 'paused', pendingInput: pending })
           get().logMessage('info', 'Awaiting input: string (syscall 8)')
         }),
+
+      // syscall 12 — readChar. Reuses the pendingInput infrastructure
+      // with kind 'char'; ConsoleInputField clamps to a single char.
+      readChar: () =>
+        new Promise<string>((resolve) => {
+          set({
+            status: 'paused',
+            pendingInput: {
+              kind: 'char',
+              resolve: (raw) => {
+                set({ pendingInput: null, status: 'running' })
+                resolve(raw.length > 0 ? raw[0]! : '')
+              },
+            },
+          })
+          get().logMessage('info', 'Awaiting input: character (syscall 12)')
+        }),
+
+      // syscall 50 — confirm dialog. Native window.confirm only
+      // returns OK/Cancel (boolean), so we collapse the MARS
+      // 3-state response: OK → Yes (0), Cancel → No (1). Real Cancel
+      // (2) is unreachable until we build a custom 3-button modal.
+      confirm: (message) =>
+        Promise.resolve(
+          typeof window !== 'undefined' && window.confirm(message) ? 0 : 1,
+        ),
+
+      // syscall 54 — message dialog. Native window.alert prefixed
+      // with the message kind so the user sees the severity. A
+      // custom modal with iconography would be a future polish.
+      alert: (message, kind) => {
+        const prefix =
+          kind === 'warn'    ? '[Warning] '
+          : kind === 'error' ? '[Error] '
+          : kind === 'question' ? '[?] '
+          : ''
+        if (typeof window !== 'undefined') window.alert(prefix + message)
+        return Promise.resolve()
+      },
+
+      // syscall 51 — input int dialog (Phase 2H).
+      promptInt: (message) => {
+        if (typeof window === 'undefined') return Promise.resolve({ value: 0, cancelled: true })
+        const raw = window.prompt(message)
+        if (raw === null) return Promise.resolve({ value: 0, cancelled: true })
+        const n = parseInt(raw.trim(), 10)
+        if (Number.isNaN(n)) return Promise.resolve({ value: 0, cancelled: false, invalid: true })
+        return Promise.resolve({ value: n | 0, cancelled: false })
+      },
+
+      // syscall 53 — input string dialog (Phase 2H).
+      promptString: (message) => {
+        if (typeof window === 'undefined') return Promise.resolve({ value: '', cancelled: true })
+        const raw = window.prompt(message)
+        if (raw === null) return Promise.resolve({ value: '', cancelled: true })
+        return Promise.resolve({ value: raw, cancelled: false })
+      },
 
       exit: () => {
         _stopFlag = true
@@ -1045,6 +1115,16 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const next = { ...get().simSettings, [key]: value }
       set({ simSettings: next })
       writePersistedSimSettings(next)
+      // Phase 2C/2D — propagate engine-affecting toggles to the live
+      // simulator so the change takes effect mid-program. The flags
+      // are also re-applied at assemble time so a fresh sim picks
+      // them up.
+      if (key === 'delayedBranching' && _sim) {
+        _sim.setDelayedBranching(value as boolean)
+      }
+      if (key === 'selfModifyingCode' && _sim) {
+        _sim.setAllowSelfModifyingCode(value as boolean)
+      }
     },
 
     openSettings:  () => set({ settingsDialogOpen: true  }),
@@ -1058,6 +1138,12 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     toolsDialog: null,
     openTool:  (which) => set({ toolsDialog: which }),
     closeTool: ()      => set({ toolsDialog: null  }),
+
+    fpRegisters: {
+      values: new Array<number>(32).fill(0),
+      condFlag: false,
+      changed: new Set<number>(),
+    },
 
     writeMemoryWord: (addr, value) => {
       if (!_sim) return false
@@ -1329,8 +1415,12 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       clearHistory()
       const sim = makeSim()
       sim.load(program)
+      const settings = get().simSettings
+      sim.setDelayedBranching(settings.delayedBranching)
+      sim.setAllowSelfModifyingCode(settings.selfModifyingCode)
       patchMemoryForBackstep(sim)
       const engineState = sim.getState()
+      const fpuState = sim.getFpuState()
       set({
         status: 'ready',
         program,
@@ -1339,6 +1429,11 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         assemblerErrors: [],
         runtimeError: null,
         instructionsExecuted: 0,
+        fpRegisters: {
+          values: fpuState.fpRegisters,
+          condFlag: fpuState.condFlag,
+          changed: fpuState.lastChangedFpRegisters,
+        },
       })
       get().logMessage('info', `Assembled successfully: ${program.instructions.length} instructions.`)
       get().refreshMemorySnapshot()
@@ -1356,10 +1451,16 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           await sim.step()
           _currentMemWrites = null
           const engineState = sim.getState()
+          const fpuState = sim.getFpuState()
           set({
             status: sim.isHalted() ? 'halted' : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
             instructionsExecuted: engineState.stepCount,
+            fpRegisters: {
+              values: fpuState.fpRegisters,
+              condFlag: fpuState.condFlag,
+              changed: fpuState.lastChangedFpRegisters,
+            },
           })
           get().refreshMemorySnapshot()
         } catch (e: unknown) {
@@ -1429,6 +1530,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
             }
           }
           const engineState = sim.getState()
+          const fpuState = sim.getFpuState()
           const prevRegisters = get().registers
           set({
             status:
@@ -1437,6 +1539,11 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
               : 'paused',
             registers: buildSnapshot(engineState, prevRegisters),
             instructionsExecuted: engineState.stepCount,
+            fpRegisters: {
+              values: fpuState.fpRegisters,
+              condFlag: fpuState.condFlag,
+              changed: fpuState.lastChangedFpRegisters,
+            },
           })
           get().refreshMemorySnapshot()
         } catch (e: unknown) {
@@ -1460,6 +1567,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         patchMemoryForBackstep(sim)
       }
       const engineState = sim?.getState()
+      const fpuState = sim?.getFpuState()
       set({
         status: sim ? 'ready' : 'idle',
         registers: engineState
@@ -1474,6 +1582,9 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         // collects when references drop.
         pendingInput: null,
         instructionsExecuted: 0,
+        fpRegisters: fpuState
+          ? { values: fpuState.fpRegisters, condFlag: fpuState.condFlag, changed: fpuState.lastChangedFpRegisters }
+          : { values: new Array<number>(32).fill(0), condFlag: false, changed: new Set<number>() },
       })
       _stopFlag = false
     },

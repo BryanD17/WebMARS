@@ -252,27 +252,21 @@ export function SettingsDialog() {
                 <Section title="Simulator behaviour">
                   <Toggle
                     label="Delayed branching"
-                    description="Execute the instruction immediately after a branch (real-MIPS branch-delay slot)."
+                    description="Execute the instruction immediately after a branch (real-MIPS branch-delay slot). Most course material assumes this is OFF."
                     checked={simSettings.delayedBranching}
                     onChange={(v) => setSimSetting('delayedBranching', v)}
-                    badge="Phase 2C"
-                    disabled
                   />
                   <Toggle
-                    label="Coprocessor 0 / 1 panels"
-                    description="Show $f0–$f31 (FPU) and CP0 status / cause / EPC registers in the right panel."
+                    label="FPU ($f0–$f31) panel"
+                    description="Show the coprocessor 1 register file in the right panel. Requires Phase 2B engine support."
                     checked={simSettings.coproc01Panels}
                     onChange={(v) => setSimSetting('coproc01Panels', v)}
-                    badge="Phase 2B"
-                    disabled
                   />
                   <Toggle
                     label="Self-modifying code allowed"
                     description="Permit stores to the .text segment. Off by default — most programs hit this by accident."
                     checked={simSettings.selfModifyingCode}
                     onChange={(v) => setSimSetting('selfModifyingCode', v)}
-                    badge="Phase 2D"
-                    disabled
                   />
                 </Section>
                 <Section title="Notes">

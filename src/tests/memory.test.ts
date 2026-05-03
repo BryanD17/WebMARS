@@ -2,7 +2,15 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Memory, TEXT_BASE, DATA_BASE } from '../core/memory';
 
 let mem: Memory;
-beforeEach(() => { mem = new Memory(); });
+beforeEach(() => {
+  mem = new Memory();
+  // These unit tests exercise read/write mechanics by writing to
+  // TEXT_BASE (a known-mapped address); they pre-date Phase 2D's
+  // self-modifying-code guard, so opt in to text writes here so the
+  // mechanics stay verifiable. Phase 2D's policy is exercised by
+  // selfModifyingCode.test.ts.
+  mem.setAllowTextWrites(true);
+});
 
 describe('Memory readWord/writeWord', () => {
   it('writes and reads at TEXT_BASE', () => {

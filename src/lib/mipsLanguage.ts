@@ -30,6 +30,16 @@ const MNEMONICS = [
   'li', 'la', 'move', 'blt', 'ble', 'bgt', 'bge', 'neg', 'not', 'nop',
   // Syscall
   'syscall',
+  // Coprocessor 1 (FPU) — Phase 2B. Dotted mnemonics work because
+  // the identifier regex includes '.' as a name char.
+  'add.s', 'sub.s', 'mul.s', 'div.s',
+  'sqrt.s', 'abs.s', 'mov.s', 'neg.s',
+  'cvt.s.w', 'cvt.w.s',
+  'c.eq.s', 'c.lt.s', 'c.le.s',
+  'bc1f', 'bc1t',
+  'mtc1', 'mfc1', 'lwc1', 'swc1',
+  // Trap instructions — Phase 2F.
+  'teq', 'tne', 'tlt', 'tltu', 'tge', 'tgeu',
 ] as const
 
 const DIRECTIVES = [
@@ -114,6 +124,38 @@ const INSTRUCTION_REFERENCE: Record<string, InstructionRef> = {
 
   // Syscall
   syscall: { signature: 'syscall',               desc: 'System call. $v0 selects service; $a0–$a3 carry args. v1.0 supports 1, 4, 5, 8, 10.' },
+
+  // Coprocessor 1 (FPU) — single-precision arithmetic, comparison,
+  // load/move, and branch. Operands are FPU registers $f0..$f31; mtc1
+  // and mfc1 bridge to the GPR file.
+  'add.s':  { signature: 'add.s $fd, $fs, $ft',  desc: 'Single-precision add. $fd = $fs + $ft.' },
+  'sub.s':  { signature: 'sub.s $fd, $fs, $ft',  desc: 'Single-precision subtract. $fd = $fs - $ft.' },
+  'mul.s':  { signature: 'mul.s $fd, $fs, $ft',  desc: 'Single-precision multiply. $fd = $fs * $ft.' },
+  'div.s':  { signature: 'div.s $fd, $fs, $ft',  desc: 'Single-precision divide. $fd = $fs / $ft.' },
+  'sqrt.s': { signature: 'sqrt.s $fd, $fs',      desc: 'Single-precision square root. $fd = sqrt($fs).' },
+  'abs.s':  { signature: 'abs.s $fd, $fs',       desc: 'Single-precision absolute value. $fd = |$fs|.' },
+  'mov.s':  { signature: 'mov.s $fd, $fs',       desc: 'Copy single-precision. $fd = $fs (bit-for-bit).' },
+  'neg.s':  { signature: 'neg.s $fd, $fs',       desc: 'Single-precision negate. $fd = -$fs.' },
+  'cvt.s.w':{ signature: 'cvt.s.w $fd, $fs',     desc: 'Convert int32 to single-precision. $fd = (float) $fs.' },
+  'cvt.w.s':{ signature: 'cvt.w.s $fd, $fs',     desc: 'Convert single-precision to int32 (truncate). $fd = (int) $fs.' },
+  'c.eq.s': { signature: 'c.eq.s $fs, $ft',      desc: 'Compare equal (single). cc[0] = ($fs == $ft).' },
+  'c.lt.s': { signature: 'c.lt.s $fs, $ft',      desc: 'Compare less-than (single). cc[0] = ($fs < $ft).' },
+  'c.le.s': { signature: 'c.le.s $fs, $ft',      desc: 'Compare less-or-equal (single). cc[0] = ($fs <= $ft).' },
+  'bc1f':   { signature: 'bc1f label',           desc: 'Branch if FPU cc[0] is false. PC = label if !cc[0].' },
+  'bc1t':   { signature: 'bc1t label',           desc: 'Branch if FPU cc[0] is true. PC = label if cc[0].' },
+  'mtc1':   { signature: 'mtc1 $rt, $fs',        desc: 'Move word from GPR to FPR. $fs ← bits($rt).' },
+  'mfc1':   { signature: 'mfc1 $rt, $fs',        desc: 'Move word from FPR to GPR. $rt ← bits($fs) (sign-extended).' },
+  'lwc1':   { signature: 'lwc1 $ft, offset($rs)',desc: 'Load word into FPR. $ft = MEM[$rs + offset]. Address must be 4-byte aligned.' },
+  'swc1':   { signature: 'swc1 $ft, offset($rs)',desc: 'Store word from FPR. MEM[$rs + offset] = $ft. Address must be 4-byte aligned.' },
+
+  // Trap instructions — Phase 2F. Each compares $rs against $rt and
+  // raises a runtime trap when its condition holds.
+  teq:  { signature: 'teq $rs, $rt',  desc: 'Trap if equal. Raises a runtime error when $rs == $rt.' },
+  tne:  { signature: 'tne $rs, $rt',  desc: 'Trap if not equal. Raises a runtime error when $rs != $rt.' },
+  tlt:  { signature: 'tlt $rs, $rt',  desc: 'Trap if less than (signed). Raises when $rs < $rt.' },
+  tltu: { signature: 'tltu $rs, $rt', desc: 'Trap if less than (unsigned). Raises when $rs <u $rt.' },
+  tge:  { signature: 'tge $rs, $rt',  desc: 'Trap if greater or equal (signed). Raises when $rs >= $rt.' },
+  tgeu: { signature: 'tgeu $rs, $rt', desc: 'Trap if greater or equal (unsigned). Raises when $rs >=u $rt.' },
 }
 
 const monarchTokens: languages.IMonarchLanguage = {
