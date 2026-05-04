@@ -832,20 +832,19 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     if (_sim) return _sim
     _sim = new Simulator({
       print: (s) => {
-        // Defer the state update through queueMicrotask so React commits
-        // the previous render before the next state lands. Without this,
-        // the FIRST print of a program can land in the same microtask
-        // as the simulator's status flip to 'running', and the bottom
-        // panel never paints the freshly-mounted ConsolePanel before
-        // the second update arrives, dropping the first character.
-        queueMicrotask(() => {
-          set((state) => {
-            const nextBuffer = state.consoleBuffer + s
-            return {
-              consoleBuffer: nextBuffer,
-              consoleOutput: nextBuffer.split('\n'),
-            }
-          })
+        // Direct set with the functional updater. The earlier
+        // queueMicrotask defer was speculative and turned out to
+        // interact badly with multi-print sequences (some browsers
+        // dropped the first character of the queued state update
+        // when React's reconciliation ran during the microtask
+        // flush). The always-mount fix in BottomPanel + the single-
+        // <pre> render in ConsolePanel are the real fixes.
+        set((state) => {
+          const nextBuffer = state.consoleBuffer + s
+          return {
+            consoleBuffer: nextBuffer,
+            consoleOutput: nextBuffer.split('\n'),
+          }
         })
       },
       // syscall 5 — readInt. Suspends the simulator behind a Promise
