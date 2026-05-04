@@ -523,6 +523,13 @@ interface SimulatorStoreState {
   runtimeError: RuntimeError | null
   inspectorTab: InspectorTab
 
+  // ─ Phase 3 SA-1: source-of-truth console buffer ─
+  // The simulator's print() callback appends here; consoleOutput is
+  // derived (split on '\n') so legacy code keeps working. Avoids the
+  // first-byte loss caused by render-timing races against per-call
+  // array allocation.
+  consoleBuffer: string
+
   // ─ contract actions ─
   setSource: (next: string) => void
   setInspectorTab: (tab: InspectorTab) => void
@@ -732,7 +739,21 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     if (_sim) return _sim
     _sim = new Simulator({
       print: (s) => {
-        set((state) => ({ consoleOutput: [...state.consoleOutput, s] }))
+        // Defer the state update through queueMicrotask so React commits
+        // the previous render before the next state lands. Without this,
+        // the FIRST print of a program can land in the same microtask
+        // as the simulator's status flip to 'running', and the bottom
+        // panel never paints the freshly-mounted ConsolePanel before
+        // the second update arrives, dropping the first character.
+        queueMicrotask(() => {
+          set((state) => {
+            const nextBuffer = state.consoleBuffer + s
+            return {
+              consoleBuffer: nextBuffer,
+              consoleOutput: nextBuffer.split('\n'),
+            }
+          })
+        })
       },
       // syscall 5 — readInt. Suspends the simulator behind a Promise
       // that the UI's submitInput action resolves with a parsed int.
@@ -870,6 +891,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     status: 'idle',
     registers: initialRegisters,
     consoleOutput: [],
+    consoleBuffer: '',
     assemblerErrors: [],
     runtimeError: null,
     inspectorTab: 'registers',
@@ -939,7 +961,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
 
     clearMessages: () => set({ messages: [] }),
 
-    clearConsole: () => set({ consoleOutput: [] }),
+    clearConsole: () => set({ consoleOutput: [], consoleBuffer: '' }),
 
     setConsoleFilter: (next) => set({ consoleFilter: next }),
 
@@ -1078,17 +1100,20 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       memHolder.halted = snap.halted
       memHolder.stepCount = snap.stepCount
       memHolder.lastChanged = new Set()
-      // Trim console output back to its pre-step length. Side effects
-      // like syscall exits aren't fully reversible — `halted` and
-      // `pc` cover the simulator-visible part; the toolbar's status
-      // pill flips back to 'paused' so the user sees they can step
-      // forward again.
+      // Trim the console buffer back to its pre-step character count
+      // and re-derive consoleOutput. SA-1's switch from per-print
+      // array-push to a single accumulating string means the snapshot
+      // now records buffer length in characters, not array elements.
       const engineState = sim.getState()
-      set((curr) => ({
-        status: 'paused',
-        registers: buildSnapshot(engineState, curr.registers),
-        consoleOutput: curr.consoleOutput.slice(0, snap.consoleLen),
-      }))
+      set((curr) => {
+        const trimmedBuffer = curr.consoleBuffer.slice(0, snap.consoleLen)
+        return {
+          status: 'paused',
+          registers: buildSnapshot(engineState, curr.registers),
+          consoleBuffer: trimmedBuffer,
+          consoleOutput: trimmedBuffer.split('\n'),
+        }
+      })
       get().refreshMemorySnapshot()
     },
 
@@ -1426,6 +1451,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         program,
         registers: buildSnapshot(engineState, initialRegisters),
         consoleOutput: [],
+        consoleBuffer: '',
         assemblerErrors: [],
         runtimeError: null,
         instructionsExecuted: 0,
@@ -1446,8 +1472,11 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       patchMemoryForBackstep(sim)
       void (async () => {
         try {
-          set({ status: 'running' })
-          pushHistorySnapshot(sim, get().consoleOutput.length)
+          // SA-1: pre-warm a console-buffer set BEFORE the first
+          // sim.step so React commits a paint of the (always-mounted)
+          // ConsolePanel before the first print's microtask lands.
+          set({ status: 'running', consoleBuffer: get().consoleBuffer })
+          pushHistorySnapshot(sim, get().consoleBuffer.length)
           await sim.step()
           _currentMemWrites = null
           const engineState = sim.getState()
@@ -1480,7 +1509,10 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const sim = makeSim()
       patchMemoryForBackstep(sim)
       _stopFlag = false
-      set({ status: 'running' })
+      // SA-1: pre-warm console-buffer set BEFORE the first sim.step
+      // so React commits a paint of the always-mounted ConsolePanel
+      // before the first print's microtask lands.
+      set({ status: 'running', consoleBuffer: get().consoleBuffer })
       void (async () => {
         try {
           let hitBreakpoint = false
@@ -1515,7 +1547,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
               await new Promise<void>((r) => setTimeout(r, 1000 / runSpeed))
             }
             const prevRegisters = get().registers
-            pushHistorySnapshot(sim, get().consoleOutput.length)
+            pushHistorySnapshot(sim, get().consoleBuffer.length)
             await sim.step()
             _currentMemWrites = null
             if (runSpeed === 0 && i % 500 === 0) {
@@ -1574,6 +1606,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           ? buildSnapshot(engineState, initialRegisters)
           : initialRegisters,
         consoleOutput: [],
+        consoleBuffer: '',
         assemblerErrors: [],
         runtimeError: null,
         // Discarding any pending input — the program isn't waiting
