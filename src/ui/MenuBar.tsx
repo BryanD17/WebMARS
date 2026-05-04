@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSimulator, type RecentFile, type ThemeName } from '@/hooks/useSimulator.ts'
+import { useSimulator, type RecentFile, type ThemeName, type NumberBase } from '@/hooks/useSimulator.ts'
+import { runEditorAction } from '@/lib/editorActions.ts'
+import { REPO_URL, ISSUES_URL } from '@/lib/constants.ts'
 import { cn } from './cn.ts'
 
 // Each menu item is either a clickable action, a disabled placeholder
@@ -48,8 +50,25 @@ function buildMenus(actions: {
   recentFiles: ReadonlyArray<RecentFile>
   openSettings: () => void
   setTheme: (next: ThemeName) => void
+  setNumberBase: (next: NumberBase) => void
   openInstructionCounter: () => void
+  // Phase 3 SA-9 / SA-11 wiring
+  assemble: () => void
+  run: () => void
+  pause: () => void
+  step: () => void
+  backstep: () => void
+  reset: () => void
+  openCommandPalette: () => void
 }): ReadonlyArray<MenuDef> {
+  // Phase 3 SA-11: external links open in a new tab with proper rel
+  // attrs. Internal "in-app destination" items are wired to existing
+  // dialog opens (Settings, command palette) until SA-6 ships the
+  // dedicated HelpDialog.
+  function openExternal(url: string): void {
+    if (typeof window === 'undefined') return
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
   // Build the File menu's "Open Recent" section dynamically from the
   // store's recentFiles array. Each entry is a menuitem labeled with
   // the filename + a relative timestamp; clicking re-opens the file
@@ -86,14 +105,14 @@ function buildMenus(actions: {
   {
     label: 'Edit',
     items: [
-      { kind: 'action', label: 'Undo',             shortcut: 'Ctrl+Z',       disabled: true },
-      { kind: 'action', label: 'Redo',             shortcut: 'Ctrl+Shift+Z', disabled: true },
+      { kind: 'action', label: 'Undo',             shortcut: 'Ctrl+Z',       onClick: () => runEditorAction('undo') },
+      { kind: 'action', label: 'Redo',             shortcut: 'Ctrl+Shift+Z', onClick: () => runEditorAction('redo') },
       { kind: 'separator' },
-      { kind: 'action', label: 'Find',             shortcut: 'Ctrl+F',       disabled: true },
-      { kind: 'action', label: 'Replace',          shortcut: 'Ctrl+H',       disabled: true },
-      { kind: 'action', label: 'Go to Line…',      shortcut: 'Ctrl+G',       disabled: true },
+      { kind: 'action', label: 'Find',             shortcut: 'Ctrl+F',       onClick: () => runEditorAction('actions.find') },
+      { kind: 'action', label: 'Replace',          shortcut: 'Ctrl+H',       onClick: () => runEditorAction('editor.action.startFindReplaceAction') },
+      { kind: 'action', label: 'Go to Line…',      shortcut: 'Ctrl+G',       onClick: () => runEditorAction('editor.action.gotoLine') },
       { kind: 'separator' },
-      { kind: 'action', label: 'Toggle Line Comment', shortcut: 'Ctrl+/',    disabled: true },
+      { kind: 'action', label: 'Toggle Line Comment', shortcut: 'Ctrl+/',    onClick: () => runEditorAction('editor.action.commentLine') },
     ],
   },
   {
@@ -103,23 +122,27 @@ function buildMenus(actions: {
       { kind: 'action', label: 'Toggle Right Panel',   shortcut: 'Ctrl+Alt+B', onClick: actions.toggleRightPanel  },
       { kind: 'action', label: 'Toggle Bottom Panel',  shortcut: 'Ctrl+J',     onClick: actions.toggleBottomPanel },
       { kind: 'separator' },
-      { kind: 'action', label: 'Number Base · Hex',                            disabled: true },
-      { kind: 'action', label: 'Number Base · Dec',                            disabled: true },
-      { kind: 'action', label: 'Number Base · Bin',                            disabled: true },
+      // Phase 3 SA-9: View menu also surfaces the editor's find UI
+      // for users who don't know the keyboard shortcut.
+      { kind: 'action', label: 'Find / Replace Bar',  shortcut: 'Ctrl+G',     onClick: () => runEditorAction('actions.find') },
+      { kind: 'separator' },
+      { kind: 'action', label: 'Number Base · Hex',  onClick: () => actions.setNumberBase('hex') },
+      { kind: 'action', label: 'Number Base · Dec',  onClick: () => actions.setNumberBase('dec') },
+      { kind: 'action', label: 'Number Base · Bin',  onClick: () => actions.setNumberBase('bin') },
     ],
   },
   {
     label: 'Run',
     items: [
-      { kind: 'action', label: 'Assemble',         shortcut: 'F3',        disabled: true },
-      { kind: 'action', label: 'Run',              shortcut: 'F5',        disabled: true },
-      { kind: 'action', label: 'Pause',            shortcut: 'F6',        disabled: true },
-      { kind: 'action', label: 'Step',             shortcut: 'F7',        disabled: true },
-      { kind: 'action', label: 'Backstep',         shortcut: 'Shift+F7',  disabled: true },
+      { kind: 'action', label: 'Assemble',         shortcut: 'F3',        onClick: actions.assemble },
+      { kind: 'action', label: 'Run',              shortcut: 'F5',        onClick: actions.run },
+      { kind: 'action', label: 'Pause',            shortcut: 'F6',        onClick: actions.pause },
+      { kind: 'action', label: 'Step',             shortcut: 'F7',        onClick: actions.step },
+      { kind: 'action', label: 'Backstep',         shortcut: 'Shift+F7',  onClick: actions.backstep },
       { kind: 'action', label: 'Run to Cursor',    shortcut: 'F8',        disabled: true },
       { kind: 'action', label: 'Toggle Breakpoint',shortcut: 'F9',        disabled: true },
       { kind: 'separator' },
-      { kind: 'action', label: 'Reset',            shortcut: 'Ctrl+R',    disabled: true },
+      { kind: 'action', label: 'Reset',                                    onClick: actions.reset },
     ],
   },
   {
@@ -144,10 +167,16 @@ function buildMenus(actions: {
   {
     label: 'Help',
     items: [
-      { kind: 'action', label: 'Keyboard Shortcuts', shortcut: '?',  disabled: true },
+      // Until SA-6 lands the dedicated HelpDialog, "Keyboard
+      // Shortcuts" surfaces the command palette which lists every
+      // shortcut next to its action.
+      { kind: 'action', label: 'Keyboard Shortcuts', shortcut: 'Ctrl+Shift+P', onClick: actions.openCommandPalette },
       { kind: 'separator' },
-      { kind: 'action', label: 'GitHub Repository',                  disabled: true },
-      { kind: 'action', label: 'About WebMARS',                      disabled: true },
+      { kind: 'action', label: 'View on GitHub',    onClick: () => openExternal(REPO_URL) },
+      { kind: 'action', label: 'Report a Bug',      onClick: () => openExternal(ISSUES_URL) },
+      { kind: 'separator' },
+      // SA-6 will replace this with an in-app About tab.
+      { kind: 'action', label: 'About WebMARS',     onClick: () => openExternal(`${REPO_URL}#webmars`) },
     ],
   },
   ]
@@ -172,6 +201,14 @@ export function MenuBar() {
   const openSettings      = useSimulator((s) => s.openSettings)
   const setTheme          = useSimulator((s) => s.setTheme)
   const openTool          = useSimulator((s) => s.openTool)
+  const setNumberBase     = useSimulator((s) => s.setNumberBase)
+  const assemble          = useSimulator((s) => s.assemble)
+  const run               = useSimulator((s) => s.run)
+  const pause             = useSimulator((s) => s.pause)
+  const step              = useSimulator((s) => s.step)
+  const backstep          = useSimulator((s) => s.backstep)
+  const reset             = useSimulator((s) => s.reset)
+  const openCommandPalette= useSimulator((s) => s.openCommandPalette)
 
   const closeActive = async (): Promise<void> => {
     if (activeFileId !== null) await closeFile(activeFileId)
@@ -193,14 +230,19 @@ export function MenuBar() {
         recentFiles,
         openSettings,
         setTheme,
+        setNumberBase,
         openInstructionCounter: () => openTool('instructionCounter'),
+        assemble, run, pause, step, backstep, reset,
+        openCommandPalette,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       toggleLeftRail, toggleRightPanel, toggleBottomPanel,
       newFile, openFromDisk, saveActive, saveActiveAs, saveAll,
       activeFileId, closeFile, closeAll, recentFiles,
-      openSettings, setTheme, openTool,
+      openSettings, setTheme, openTool, setNumberBase,
+      assemble, run, pause, step, backstep, reset,
+      openCommandPalette,
     ],
   )
 

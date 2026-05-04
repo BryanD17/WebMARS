@@ -132,6 +132,21 @@
   background: var(--danger);
 }
 
+/* Phase 3 SA-8: low-opacity preview on hover so users see WHERE
+   they can click before committing a breakpoint. Same shape as the
+   real glyph, faded to 25% so an existing breakpoint stays visually
+   distinct. */
+.webmars-breakpoint-glyph-preview::before {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  margin: 6px auto;
+  border-radius: 50%;
+  background: var(--danger);
+  opacity: 0.25;
+}
+
 /* ─ scrollbars ─────────────────────────────────────────────────────
    Style every scrollable surface with the same thin --surface-3 thumb
    on a transparent track so register tables, tab bodies, and the

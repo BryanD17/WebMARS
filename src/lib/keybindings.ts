@@ -16,6 +16,7 @@
 
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import { getEditorCursor } from './editorCursor.ts'
+import { runEditorAction } from './editorActions.ts'
 
 type Modifier = 'Ctrl' | 'Shift' | 'Alt'
 
@@ -79,6 +80,14 @@ function buildBindings(): Binding[] {
     // Settings + palette.
     { combo: 'Ctrl+,',       preventDefault: true, run: () => useSimulator.getState().openSettings() },
     { combo: 'Ctrl+Shift+P', preventDefault: true, run: () => useSimulator.getState().openCommandPalette() },
+
+    // Phase 3 SA-9: editor actions that should work even when the
+    // editor isn't focused. When the editor IS focused, Monaco
+    // handles these natively and stops propagation, so these
+    // bindings don't double-fire.
+    { combo: 'Ctrl+G', preventDefault: true, run: () => runEditorAction('editor.action.gotoLine') },
+    { combo: 'Ctrl+F', preventDefault: true, run: () => runEditorAction('actions.find') },
+    { combo: 'Ctrl+H', preventDefault: true, run: () => runEditorAction('editor.action.startFindReplaceAction') },
   ]
 }
 
