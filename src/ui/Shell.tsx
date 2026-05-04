@@ -14,6 +14,12 @@ import { SettingsDialog } from './SettingsDialog.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
 import { InstructionCounter } from './InstructionCounter.tsx'
 import { HelpDialog } from './HelpDialog.tsx'
+import { BitmapDisplay } from './tools/BitmapDisplay.tsx'
+import { KeyboardDisplayMmio } from './tools/KeyboardDisplayMmio.tsx'
+import { FpRepresentation } from './tools/FpRepresentation.tsx'
+import { MemoryRefViz } from './tools/MemoryRefViz.tsx'
+import { ScreenMagnifier } from './tools/ScreenMagnifier.tsx'
+import { PlaceholderTool } from './tools/PlaceholderTool.tsx'
 import { ResizeHandle } from './ResizeHandle.tsx'
 import { installKeybindings } from '@/lib/keybindings.ts'
 
@@ -175,6 +181,12 @@ export function Shell() {
       <CommandPalette />
       <InstructionCounter />
       <HelpDialog />
+      <BitmapDisplay />
+      <KeyboardDisplayMmio />
+      <FpRepresentation />
+      <MemoryRefViz />
+      <PlaceholderTool />
+      <ScreenMagnifier />
     </>
   )
 }

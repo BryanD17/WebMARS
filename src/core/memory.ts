@@ -5,6 +5,14 @@ export const DATA_BASE  = 0x10010000;
 export const STACK_BASE = 0x7fffeffc;
 export const MEM_SIZE   = 0x00800000;
 
+// Phase 3 SA-13: memory-mapped I/O addresses (real MARS layout).
+export const MMIO_RECEIVER_CONTROL    = 0xffff0000;
+export const MMIO_RECEIVER_DATA       = 0xffff0004;
+export const MMIO_TRANSMITTER_CONTROL = 0xffff0008;
+export const MMIO_TRANSMITTER_DATA    = 0xffff000c;
+export const MMIO_BASE = 0xffff0000;
+export const MMIO_END  = 0xffff0010;   // exclusive
+
 export class Memory {
   private buf: ArrayBuffer;
   private view: DataView;
@@ -15,6 +23,15 @@ export class Memory {
   // loadProgram() which bypasses the guard.
   private allowTextWrites: boolean = false;
 
+  // Phase 3 SA-13 — MMIO state. The receiver pair holds whatever
+  // the host pushed via mmioPushKey; reads from RECEIVER_DATA clear
+  // the ready bit. The transmitter is always ready in our model
+  // and writes route through onTransmitterWrite (set by the
+  // Keyboard/Display MMIO tool).
+  private mmioReceiverReady: boolean = false;
+  private mmioReceiverData:  number  = 0;
+  onTransmitterWrite: ((char: number) => void) | null = null;
+
   constructor() {
     this.buf = new ArrayBuffer(MEM_SIZE);
     this.view = new DataView(this.buf);
@@ -22,6 +39,43 @@ export class Memory {
 
   setAllowTextWrites(on: boolean): void {
     this.allowTextWrites = on;
+  }
+
+  // Push a keystroke into the receiver. Called from the MMIO tool
+  // when the user types into the keyboard pane.
+  mmioPushKey(char: number): void {
+    this.mmioReceiverReady = true;
+    this.mmioReceiverData  = char & 0xff;
+  }
+
+  private isMmioAddr(addr: number): boolean {
+    const a = toUnsigned32(addr);
+    return a >= MMIO_BASE && a < MMIO_END;
+  }
+
+  private mmioReadWord(addr: number): number {
+    const a = toUnsigned32(addr);
+    if (a === MMIO_RECEIVER_CONTROL)    return this.mmioReceiverReady ? 1 : 0;
+    if (a === MMIO_RECEIVER_DATA) {
+      const data = this.mmioReceiverData;
+      this.mmioReceiverReady = false;     // reading consumes the byte
+      return data;
+    }
+    if (a === MMIO_TRANSMITTER_CONTROL) return 1;     // always ready
+    if (a === MMIO_TRANSMITTER_DATA)    return 0;     // write-only
+    throw new Error(`MMIO read at unmapped address 0x${a.toString(16)}`);
+  }
+
+  private mmioWriteWord(addr: number, val: number): void {
+    const a = toUnsigned32(addr);
+    if (a === MMIO_TRANSMITTER_DATA) {
+      const ch = val & 0xff;
+      if (this.onTransmitterWrite) this.onTransmitterWrite(ch);
+      return;
+    }
+    // Other MMIO addresses are read-only in our model. Silently
+    // ignore writes (real MARS allows write to control regs but
+    // their effect is implementation-defined).
   }
 
   private offset(addr: number): number {
@@ -45,11 +99,13 @@ export class Memory {
 
   readWord(addr: number): number {
     if (addr & 3) throw new Error(`Unaligned word read at 0x${toUnsigned32(addr).toString(16)}`);
+    if (this.isMmioAddr(addr)) return this.mmioReadWord(addr);
     return this.view.getInt32(this.offset(addr), false);
   }
 
   writeWord(addr: number, val: number): void {
     if (addr & 3) throw new Error(`Unaligned word write at 0x${toUnsigned32(addr).toString(16)}`);
+    if (this.isMmioAddr(addr)) { this.mmioWriteWord(addr, val); return; }
     this.guardWrite(addr);
     this.view.setInt32(this.offset(addr), val, false);
   }

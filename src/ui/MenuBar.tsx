@@ -52,6 +52,9 @@ function buildMenus(actions: {
   setTheme: (next: ThemeName) => void
   setNumberBase: (next: NumberBase) => void
   openInstructionCounter: () => void
+  openTool: (id: 'bitmap' | 'mmio' | 'fpRepr' | 'memRef') => void
+  openPlaceholder: (name: string) => void
+  toggleScreenMagnifier: () => void
   // Phase 3 SA-9 / SA-11 wiring
   assemble: () => void
   run: () => void
@@ -149,10 +152,19 @@ function buildMenus(actions: {
   {
     label: 'Tools',
     items: [
-      { kind: 'action', label: 'Instruction Counter', onClick: actions.openInstructionCounter },
+      { kind: 'action', label: 'Instruction Counter',          onClick: actions.openInstructionCounter },
+      { kind: 'action', label: 'Bitmap Display',               onClick: () => actions.openTool('bitmap') },
+      { kind: 'action', label: 'Keyboard / Display MMIO',      onClick: () => actions.openTool('mmio') },
+      { kind: 'action', label: 'Floating-Point Representation',onClick: () => actions.openTool('fpRepr') },
+      { kind: 'action', label: 'Memory Reference Visualization',onClick: () => actions.openTool('memRef') },
+      { kind: 'action', label: 'Screen Magnifier',             onClick: actions.toggleScreenMagnifier },
       { kind: 'separator' },
-      { kind: 'action', label: 'Cache Simulator (Phase 3)',                 disabled: true },
-      { kind: 'action', label: 'Memory Reference Visualization (Phase 3)',  disabled: true },
+      { kind: 'action', label: 'Data Cache Simulator',         onClick: () => actions.openPlaceholder('Data Cache Simulator') },
+      { kind: 'action', label: 'MIPS X-Ray',                   onClick: () => actions.openPlaceholder('MIPS X-Ray') },
+      { kind: 'action', label: 'BHT Simulator',                onClick: () => actions.openPlaceholder('BHT Simulator') },
+      { kind: 'action', label: 'Digital Lab Sim',              onClick: () => actions.openPlaceholder('Digital Lab Sim') },
+      { kind: 'action', label: 'Scavenger Hunt',               onClick: () => actions.openPlaceholder('Scavenger Hunt') },
+      { kind: 'action', label: 'Mars Bot',                     onClick: () => actions.openPlaceholder('Mars Bot') },
     ],
   },
   {
@@ -204,6 +216,8 @@ export function MenuBar() {
   const openSettings      = useSimulator((s) => s.openSettings)
   const setTheme          = useSimulator((s) => s.setTheme)
   const openTool          = useSimulator((s) => s.openTool)
+  const openPlaceholderTool = useSimulator((s) => s.openPlaceholderTool)
+  const toggleScreenMagnifier = useSimulator((s) => s.toggleScreenMagnifier)
   const setNumberBase     = useSimulator((s) => s.setNumberBase)
   const assemble          = useSimulator((s) => s.assemble)
   const run               = useSimulator((s) => s.run)
@@ -236,6 +250,9 @@ export function MenuBar() {
         setTheme,
         setNumberBase,
         openInstructionCounter: () => openTool('instructionCounter'),
+        openTool,
+        openPlaceholder: openPlaceholderTool,
+        toggleScreenMagnifier,
         assemble, run, pause, step, backstep, reset,
         openCommandPalette,
         openHelp,
@@ -248,6 +265,7 @@ export function MenuBar() {
       openSettings, setTheme, openTool, setNumberBase,
       assemble, run, pause, step, backstep, reset,
       openCommandPalette, openHelp,
+      openPlaceholderTool, toggleScreenMagnifier,
     ],
   )
 

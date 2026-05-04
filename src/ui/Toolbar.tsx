@@ -52,6 +52,7 @@ const EXAMPLES: ReadonlyArray<{ id: ExampleName; label: string; desc: string }> 
   { id: 'sumToN',      label: 'Sum 1..N',          desc: 'read N, print 1+2+…+N' },
   { id: 'syscallIO',   label: 'Syscall I/O',       desc: 'read int, print int (full I/O)' },
   { id: 'floatMath',   label: 'Float Math (FPU)',  desc: 'sqrt(3² + 4²) via mtc1/cvt.s.w/mul.s' },
+  { id: 'mmioEcho',    label: 'MMIO Keyboard Echo',desc: 'poll receiver, echo to transmitter' },
 ]
 
 function ExamplesDropdown() {

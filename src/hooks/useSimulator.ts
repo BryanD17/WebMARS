@@ -26,6 +26,7 @@ import stringPrintSource from '../examples/stringPrint.asm?raw'
 import sumToNSource      from '../examples/sumToN.asm?raw'
 import syscallIOSource   from '../examples/syscallIO.asm?raw'
 import floatMathSource   from '../examples/floatMath.asm?raw'
+import mmioEchoSource    from '../examples/mmioEcho.asm?raw'
 
 // Canonical MIPS / real-MARS conventions: program text starts at
 // 0x00400000 and the stack pointer initializes at 0x7FFFEFFC (top of
@@ -212,7 +213,7 @@ function computeInitialLayout(): PersistedLayout {
 // keep reading from one place.
 
 export type ExampleName =
-  | 'arraySum' | 'factorial' | 'stringPrint' | 'sumToN' | 'syscallIO' | 'floatMath'
+  | 'arraySum' | 'factorial' | 'stringPrint' | 'sumToN' | 'syscallIO' | 'floatMath' | 'mmioEcho'
 
 export interface FileEntry {
   id: string
@@ -234,6 +235,7 @@ const EXAMPLE_SOURCES: Record<ExampleName, string> = {
   sumToN:      sumToNSource,
   syscallIO:   syscallIOSource,
   floatMath:   floatMathSource,
+  mmioEcho:    mmioEchoSource,
 }
 
 const RECENT_FILES_KEY = 'webmars:recent-files'
@@ -682,9 +684,37 @@ interface SimulatorStoreState {
   // without poking _sim. Updated alongside registers in step() and
   // run(); reset to 0 by reset() / assemble().
   instructionsExecuted: number
-  toolsDialog: 'instructionCounter' | null
-  openTool:  (which: 'instructionCounter') => void
+  toolsDialog: 'instructionCounter' | 'bitmap' | 'mmio' | 'fpRepr' | 'memRef' | 'placeholder' | null
+  toolsPlaceholderName: string
+  openTool:  (which: 'instructionCounter' | 'bitmap' | 'mmio' | 'fpRepr' | 'memRef') => void
+  openPlaceholderTool: (name: string) => void
   closeTool: () => void
+
+  // Phase 3 SA-15 — Screen Magnifier toggle. Pure UI overlay, no
+  // engine state. Persisted? No — session-only.
+  screenMagnifierOn: boolean
+  toggleScreenMagnifier: () => void
+
+  // Phase 3 SA-12 — read N words from the simulator's memory at the
+  // given (word-aligned) address. Returns an empty array when no
+  // simulator exists yet. Used by the Bitmap Display tool which
+  // re-paints from this on every step.
+  dumpMemory: (base: number, words: number) => ReadonlyArray<{ addr: number; word: number }>
+
+  // Phase 3 SA-15 — memory reference counter for the Mem Ref Viz
+  // tool. Bumped from the engine's read/write hooks when the tool
+  // is mounted. Cleared via clearMemoryRefs.
+  memoryRefCounts: Map<number, number>
+  recordMemoryRef: (addr: number) => void
+  clearMemoryRefs: () => void
+
+  // Phase 3 SA-13 — MMIO bridges to the engine. The Keyboard/Display
+  // tool calls pushKeystroke when the user types; the engine's
+  // receiver registers go ready until the program reads them.
+  // setMmioTransmitter installs a host-side handler that fires
+  // whenever the program stores to MMIO_TRANSMITTER_DATA.
+  pushKeystroke: (char: number) => void
+  setMmioTransmitter: (handler: ((char: number) => void) | null) => void
 
   // ─ FPU snapshot slice (Phase 2B; not persisted) ─
   // Mirrors Simulator.getFpuState(). The 32-element values array
@@ -1224,8 +1254,40 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
 
     instructionsExecuted: 0,
     toolsDialog: null,
-    openTool:  (which) => set({ toolsDialog: which }),
-    closeTool: ()      => set({ toolsDialog: null  }),
+    toolsPlaceholderName: '',
+    openTool: (which) => set({ toolsDialog: which }),
+    openPlaceholderTool: (name) => set({ toolsDialog: 'placeholder', toolsPlaceholderName: name }),
+    closeTool: () => set({ toolsDialog: null }),
+
+    screenMagnifierOn: false,
+    toggleScreenMagnifier: () => set((s) => ({ screenMagnifierOn: !s.screenMagnifierOn })),
+
+    dumpMemory: (base, words) => {
+      if (!_sim) return []
+      try {
+        return _sim.memoryDump(base >>> 0, words)
+      } catch {
+        return []
+      }
+    },
+
+    memoryRefCounts: new Map<number, number>(),
+    recordMemoryRef: (addr) => {
+      // Aggregate at word granularity so the visualization stays
+      // useful even when programs touch byte/half addresses.
+      const aligned = (addr & ~0x3) >>> 0
+      const next = new Map(get().memoryRefCounts)
+      next.set(aligned, (next.get(aligned) ?? 0) + 1)
+      set({ memoryRefCounts: next })
+    },
+    clearMemoryRefs: () => set({ memoryRefCounts: new Map<number, number>() }),
+
+    pushKeystroke: (char) => {
+      if (_sim) _sim.pushMmioKey(char)
+    },
+    setMmioTransmitter: (handler) => {
+      if (_sim) _sim.setMmioTransmitterHandler(handler)
+    },
 
     fpRegisters: {
       values: new Array<number>(32).fill(0),
