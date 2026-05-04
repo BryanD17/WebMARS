@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Editor, type Monaco, type OnMount } from '@monaco-editor/react'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { useSimulator } from '@/hooks/useSimulator.ts'
@@ -36,6 +36,29 @@ export function CodeEditor() {
   // Phase 3 SA-8: separate decoration set for the hover preview so it
   // doesn't collide with real breakpoint decorations on the same line.
   const hoverPreviewDecorationsRef = useRef<string[]>([])
+  // Phase 3 follow-up: explicit pixel-size measurement of the editor
+  // wrapper. iOS Safari's flex layout reported height=0 to Monaco's
+  // automaticLayout ResizeObserver during the first paint; passing
+  // measured pixel sizes to Monaco directly side-steps the issue.
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
+
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    function commit(w: number, h: number): void {
+      setSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }))
+    }
+    commit(el.clientWidth, el.clientHeight)
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const cr = entry.contentRect
+      commit(Math.round(cr.width), Math.round(cr.height))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   function handleBeforeMount(monaco: Monaco): void {
     registerMips(monaco)
@@ -177,12 +200,22 @@ export function CodeEditor() {
   }, [])
 
   return (
-    <Editor
-      // 100% works on flex/grid parents that report a real pixel
-      // height. On mobile, MobileShell now uses flexbox so the
-      // parent's height is concrete on the first frame.
-      height="100%"
-      width="100%"
+    <div
+      ref={wrapperRef}
+      // The wrapper takes the full available space via absolute
+      // positioning so the ResizeObserver always sees a concrete
+      // pixel size (no flex/grid intermediary). The parent must be
+      // position:relative — both SourcePane (desktop) and the
+      // mobile main pane satisfy that.
+      style={{ position: 'absolute', inset: 0 }}
+    >
+      <Editor
+        // Pixel-explicit dimensions instead of "100%". Monaco renders
+        // the editor canvas at exactly these dimensions and updates
+        // when the ResizeObserver fires. Sidesteps the iOS Safari
+        // bug where automaticLayout received height=0 on first paint.
+        height={size.h || '100%'}
+        width={size.w || '100%'}
       language="mips"
       theme="webmars-dark"
       value={source}
@@ -229,6 +262,7 @@ export function CodeEditor() {
           horizontalScrollbarSize: 10,
         },
       }}
-    />
+      />
+    </div>
   )
 }

@@ -9,7 +9,11 @@ export function SourcePane() {
   return (
     <section
       aria-label="Source editor"
-      className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-0"
+      // Phase 3 follow-up: relative + size-bounded so CodeEditor's
+      // ResizeObserver wrapper measures a concrete pixel size on
+      // every paint. The CodeEditor wrapper inside positions
+      // itself absolutely via inset:0.
+      className="relative h-full min-h-0 min-w-0 overflow-hidden bg-surface-0"
     >
       <CodeEditor />
     </section>
