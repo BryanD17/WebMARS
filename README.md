@@ -14,30 +14,57 @@ See [the PRD](./docs/PRD.md) for the full scope, timeline, and roadmap, [the fin
 
 ## Features
 
-The v1.0 release targets the workflows students rely on most.
+The v1.1.0 release covers every workflow the curriculum needs, plus a Tools menu that goes well beyond the original PRD.
 
-### Core
+### Editor and assembler
 
-- Source editor with MIPS syntax highlighting and hover docs (Monaco).
-- Inline assembler-error squiggles plus an error overview ruler in the editor margin.
-- Two-pass MIPS32 assembler covering roughly fifty instructions across arithmetic, logical, branch, jump, load/store, FPU, and trap families.
-- Pseudo-instruction support for `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`, `neg`, `not`, `nop`.
-- Instruction-set simulator with a full 32-register integer file, 32-register single-precision FPU, HI/LO, FCSR cc[0], program counter, and a configurable text/data/stack memory layout.
-- Run, Pause, Step, Backstep (snapshot history with memory-write rewind), Run-to-cursor, Reset controls plus a 1–500 instr/s speed slider.
-- Live register file with per-step change highlighting; toggleable hex / decimal / binary views.
-- Toggleable FPU panel showing $f0–$f31 in float and bits.
-- Memory inspector with segment toggle (`.text` / `.data` / stack), base-address jump, edit-in-place, and a flash on each write.
+- Monaco editor with custom MIPS syntax highlighting and hover docs.
+- Inline assembler-error squiggles plus an error overview ruler in the margin.
+- Low-opacity breakpoint preview on gutter hover so users discover where to click.
+- Two-pass MIPS32 assembler covering ~60 instructions across arithmetic, logical, shift, branch, jump, load/store, FPU, and trap families.
+- Pseudo-instructions: `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`, `abs`, `sge`, `sgt`, `neg`, `not`, `nop`.
+- `.globl` directive accepted as a no-op for single-file assembly.
+
+### Runtime and debugging
+
+- Run, Pause, Step, Backstep, Run-to-cursor, Reset controls plus a 1–500 instr/s speed slider.
+- Backstep rewinds register state AND memory writes via a 200-entry circular snapshot history.
 - Click-to-set breakpoints in the editor gutter, persisted per file.
-- Bottom panel: Console, Messages, Problems. Console handles syscall I/O via an inline input field; Problems aggregates assembler + runtime errors with click-to-jump.
-- File system: multi-file tabs (drag to reorder), File System Access API integration for native open/save with a download fallback in non-Chromium browsers, Open Recent submenu.
-- Bundled example programs covering array sum, factorial, string print, sum 1..N, syscall I/O, and FPU floating-point math.
-- Symbol table panel resolving labels to addresses with click-to-jump.
-- Searchable instruction reference panel.
-- Settings dialog: dark / light / high-contrast themes, editor font size, simulator toggles (FPU panel, delayed branching, self-modifying code).
+- Live register file with per-step change highlighting; toggleable hex / decimal / binary views.
+- Toggleable FPU panel showing $f0–$f31 in float and bits along with the FCSR cc[0] flag.
+- Memory inspector with segment toggle (`.text` / `.data` / stack), base-address jump, edit-in-place, and a flash on each write.
+- Console handles syscall I/O via an inline input field; Messages and Problems panels aggregate runtime + assembler errors with click-to-jump.
+
+### File system and editor shell
+
+- Multi-file tabs with drag-to-reorder, right-click context menu, and an Open Recent submenu.
+- File System Access API for native open/save in Chromium browsers; download fallback in Firefox.
+- Resizable panels — drag the strip between the source pane and the bottom panel, or between the center and the right inspector. Sizes persist across reloads. Keyboard accessible (arrow keys nudge, Home resets).
+- Bundled example programs: array sum, factorial, string print, sum 1..N, syscall I/O, FPU float math, MMIO keyboard echo.
+- Symbol table panel and searchable instruction reference panel in the left rail.
+- Settings cog at the bottom of the left rail opens the Settings dialog.
+
+### Settings, commands, keyboard
+
+- Settings dialog with dark / light / high-contrast themes, editor font size, simulator toggles (FPU panel, delayed branching, self-modifying code).
 - Command palette (`Ctrl+Shift+P`) with fuzzy search across every action.
-- Keyboard shortcuts (F3/F5/F6/F7/Shift+F7/F8/F9, Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+B, Ctrl+J, Ctrl+,, …).
-- Tools menu featuring an Instruction Counter (static mnemonic histogram + runtime step count).
-- Mobile-friendly read-only mode under 768px viewport.
+- In-app help dialog (`F1` or the `?` button in the toolbar) with six tabs: Basic Instructions, Pseudo-Instructions, Directives, Syscalls, Exceptions, About.
+- Keyboard shortcuts: F1 help, F3 assemble, F5 run, F6 pause, F7 step, Shift+F7 backstep, F8 run to cursor, F9 toggle breakpoint, Ctrl+S save, Ctrl+O open, Ctrl+N new, Ctrl+G goto-line, Ctrl+F find, Ctrl+H replace, Ctrl+B/Ctrl+J/Ctrl+Alt+B layout, Ctrl+, settings.
+
+### Tools menu
+
+- **Instruction Counter** — static mnemonic histogram + runtime step count.
+- **Bitmap Display** — treats a region of memory as a 2D pixel grid; configurable cell size, dimensions, base address.
+- **Keyboard / Display MMIO** — memory-mapped I/O at 0xffff0000–0xffff000c with engine-side support and an interactive UI.
+- **Floating-Point Representation** — bit-level IEEE 754 single-precision editor with sign / exponent / mantissa decode.
+- **Memory Reference Visualization** — top-50 horizontal bar chart of accessed addresses.
+- **Screen Magnifier** — floating loupe overlay for projector demos.
+- Placeholders for v2.0: Cache Simulator, MIPS X-Ray, BHT Simulator, Digital Lab Sim, Scavenger Hunt, Mars Bot.
+
+### Mobile
+
+- Under 768px viewport, the shell switches to a tabbed mobile layout: hamburger drawer for menus, four tabs (Editor / Registers / Memory / Console), full-width control bar (Assemble / Run / Pause / Step / Reset).
+- The editor is read-only by default with an Edit toggle in the header. Word wrap is on; the minimap is hidden.
 
 ## Getting Started
 
@@ -210,21 +237,22 @@ Cross-checking simulator output against the original MARS for the same input is 
 
 **FPU — coprocessor 1, single-precision (Phase 2B):** `add.s`, `sub.s`, `mul.s`, `div.s`, `sqrt.s`, `abs.s`, `mov.s`, `neg.s`, `cvt.s.w`, `cvt.w.s`, `c.eq.s`, `c.lt.s`, `c.le.s`, `bc1f`, `bc1t`, `mtc1`, `mfc1`, `lwc1`, `swc1`. The FPU panel in the right inspector is gated behind a settings toggle.
 
-**Pseudo-instructions:** `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`, `neg`, `not`, `nop`.
+**Pseudo-instructions:** `li`, `la`, `move`, `blt`, `ble`, `bgt`, `bge`, `abs`, `sge`, `sgt`, `neg`, `not`, `nop`.
 
 **Syscalls:** `1` (print int), `4` (print string), `5` (read int), `8` (read string), `10` (exit), `11` (print char), `12` (read char), `30` (system time), `32` (sleep), `41` (random int), `42` (random int range), `50` (confirm dialog), `51` (input int dialog), `53` (input string dialog), `54` (message dialog).
 
 ## Limitations
 
-WebMARS is intentionally scoped. The following are known limitations of v1.0 and are not bugs.
+WebMARS is intentionally scoped. The following are known limitations of v1.1.0 and are not bugs.
 
-- The MARS Tools menu (bitmap display, keyboard / MMIO simulator, cache simulator, memory reference visualization) is not implemented. Only the Instruction Counter from that menu ships.
+- Tools menu coverage is partial: Instruction Counter, Bitmap Display, Keyboard / Display MMIO, Floating-Point Representation, Memory Reference Visualization, and Screen Magnifier ship as real tools. Cache Simulator, MIPS X-Ray, BHT Simulator, Digital Lab Sim, Scavenger Hunt, and Mars Bot ship as placeholder modals describing the v2.0 plan.
 - No `.include` or macros, and no multi-file projects in the assembler sense — multi-file is editor-only.
 - FPU support is single-precision only. Double-precision (`.d` ops) and coprocessor 0 (`$status`, `$cause`, `$epc`, `mfc0`/`mtc0`/`eret`) are out of scope.
 - Branch-delay-slot semantics are off by default for teaching clarity. Real-MIPS delay-slot behavior can be opted into via Settings → Simulator → "Delayed branching"; when on, `jal`/`jalr` save PC+8 to skip the delay slot.
 - Self-modifying code is rejected by default (any store into the `.text` segment throws). Settings → Simulator → "Self-modifying code allowed" lifts the guard.
 - Pipeline timing, hazards, forwarding, and cache effects are not modeled. Instruction execution is sequential and atomic.
 - The `Confirm` dialog syscall (50) collapses MARS's three-state response (Yes / No / Cancel) to two states (OK → Yes, Cancel → No) because it uses the native `window.confirm`.
+- The Screen Magnifier renders a positioned overlay rectangle but does not currently mirror the underlying pixels at 2x. Full DOM-cloning magnification needs `html2canvas` or similar; out of scope for v1.1.0. Use the OS-level zoom for projector demos in the meantime.
 - Browser persistence is `localStorage`-only — layout, theme, recent files, breakpoints, and run speed survive a reload, but source code itself is not auto-saved. Use File → Save (or `Ctrl+S`) before closing the tab.
 - The File System Access API used for native Open / Save is Chromium-only. Firefox falls back to `<input type="file">` and a blob download.
 

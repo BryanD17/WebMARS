@@ -82,3 +82,33 @@ Quality-of-life items include a custom three-button modal to replace the native 
 The test suite would benefit from a property-based pass against a reference MIPS interpreter, comparing register state after each step on randomly generated programs. This would catch the kind of edge cases that hand-written tests miss. The `addiu` sign-extension bug we found during Phase 2G is a good example: it had been in the engine since Day 2 and went undetected through every existing test because no test happened to use a negative immediate with that specific instruction.
 
 Finally, the deployed Vercel build needs to land before the project is fully delivered. The configuration already exists. The remaining work is mechanical: connect the GitHub repository to a Vercel project, confirm the build command and output directory, and update the README link from its current placeholder to the live URL.
+
+## 6. v1.1.0 Update: Phase 3 Bug-Fix Sweep
+
+After v1.0 shipped and went into use, a feedback list surfaced from real student programs and presentation prep. Phase 3 closes that list and adds a meaningful expansion of the Tools menu plus a real mobile shell. The work landed as a single squash-merged pull request covering 17 sub-agents.
+
+### Bugs fixed
+
+The most visible was a console rendering issue where the first character of the first print would be dropped. Programs that opened with `print_string "What is your age?"` rendered as "hat is your age?" until the user re-ran. The root cause was a render-timing race between the simulator's first call to `io.print` and the React tree's mount of the console panel. The fix was three-part: switch the store to a single accumulating `consoleBuffer` string and derive the legacy `consoleOutput` array from it, defer print updates through `queueMicrotask` so React commits the previous render before the next state lands, and always-mount all three bottom-panel tabs (Console, Messages, Problems) so the console is never absent from the tree at the moment a program first prints.
+
+The assembler was missing nine pseudo-instructions that real student programs leaned on: `blt`, `ble`, `bgt`, `bge`, `abs`, `sge`, `sgt`, `neg`, `not`. Each is now implemented as a textual expansion using `$at` as scratch, with the first-pass size accounting updated so that labels following a multi-instruction expansion resolve to the correct address. The `.globl` directive, which previously caused the symbol after it to be parsed as an unknown mnemonic, is now a no-op.
+
+A handful of UI bugs were also addressed: menu dropdowns scrolled past the viewport on small screens, the LeftRail settings cog did not open the Settings dialog, and the editor gutter gave no visual hint that it was clickable. Each got a focused fix.
+
+### New features
+
+The Tools menu, which previously had only Instruction Counter, gained five new working tools: Bitmap Display (treats memory as a 2D pixel grid), Keyboard / Display MMIO simulator (memory-mapped I/O at 0xffff0000–0xffff000c with engine support and a paired UI), Floating-Point Representation (bit-level IEEE 754 editor), Memory Reference Visualization (top-50 access bar chart), and Screen Magnifier (positioned overlay for projector demos). Six additional tools (Cache Simulator, MIPS X-Ray, BHT Simulator, Digital Lab Sim, Scavenger Hunt, Mars Bot) ship as placeholder modals describing their v2.0 scope.
+
+A new in-app Help dialog covers the full reference set across six tabs: Basic Instructions, Pseudo-Instructions, Directives, Syscalls, Exceptions, and About. The dialog is reachable from the toolbar's `?` button, the F1 key, or any of the Help menu items. The instruction reference data was consolidated into a single source of truth at `src/lib/instructionReference.ts` so the Monaco hover provider and the help dialog read from the same array.
+
+The shell itself gained drag-to-resize handles between the center pane and the right inspector and between the source pane and the bottom panel. Sizes persist across reloads and the handles are keyboard accessible.
+
+The mobile layout was rebuilt from scratch. The previous implementation collapsed the desktop shell into a read-only editor with a banner suggesting the user open a desktop browser. The new mobile shell is a real interface: a 56px header with a hamburger drawer for menus, a four-tab body (Editor / Registers / Memory / Console), and a 48px bottom control bar with the assemble / run / pause / step / reset operations. The editor remains read-only by default since typing assembly on a phone is painful, but the user can opt into editing through a header toggle.
+
+### Numbers
+
+v1.1.0 ships with 119 tests across 13 files, up from 103 in v1.0. The added tests cover the console first-byte regression (3 tests), the nine new pseudo-instructions (13 tests), and earlier-phase additions. The bundle grew to 405 KB of JavaScript (114 KB gzipped) plus 53 KB of CSS, up from 345 KB / 101 KB in v1.0. The growth comes mostly from the new tool modals, the help dialog reference data, and the mobile shell.
+
+### Deployment
+
+Vercel deploys WebMARS to https://www.webmarsimulator.com/ from every push to main.
