@@ -88,26 +88,50 @@ Total run time: about seven minutes if you do every section. Each section is ind
 
 ---
 
-## Section 6: Polish (about 60 seconds)
+## Section 6: Tools menu (about 90 seconds, v1.1.0)
 
-**Action 1:** Press `Ctrl+Shift+P`.
-**Say:** "Command palette. Every action in the application is reachable from here with fuzzy search. This is the same pattern as VS Code."
+**Action 1:** Open the **Tools** menu in the menu bar.
+**Say:** "WebMARS v1.1 ships a real Tools menu. Six tools are working today, six more are placeholders for v2.0 with descriptions of what they will do."
 
-**Action 2:** Type `theme` to filter. Click **Theme: Light**.
-**Say:** "We ship dark, light, and high-contrast themes. Theme choice persists across reloads."
+**Action 2:** Click **Bitmap Display**. In the dialog, set the cell size to 8 and grid to 64. Click **Connect**.
+**Say:** "Bitmap Display treats memory as a 2D pixel grid. Each word is one RGB pixel. Run a program that writes color values into the data segment and watch them paint here. This is what students use to write Pong, Snake, and Game of Life."
 
-**Action 3:** Switch back to dark via the palette or the Settings menu.
+**Action 3:** Close the Bitmap Display. Open **Tools** → **Floating-Point Representation**.
+**Say:** "Type a decimal value, see the 32 bits. Click any bit to flip it. The decoded sign, exponent, and mantissa update live. Useful when teaching IEEE 754."
 
-**Action 4:** Resize the browser window narrow, below 768 pixels wide.
-**Say:** "Below 768 pixels the shell collapses to a read-only editor with a banner. The full IDE is built for desktop workflows, but mobile users can still read code, open files, and view assembly without breaking the layout."
+**Action 4:** Close the dialog. Open **Tools** → **Memory Reference Visualization**.
+**Say:** "Open this BEFORE running a program. It tracks every memory access and shows the top 50 addresses as a bar chart. Useful for teaching locality."
 
-**Action 5:** Restore the browser width.
+**Action 5:** Close the dialog. Press `F1`.
+**Say:** "F1 opens the in-app help dialog. Six tabs cover every supported instruction, every pseudo-op, every directive, every syscall, and the runtime exceptions. Filterable. No more flipping between WebMARS and the MARS PDF."
+
+**Action 6:** Close the help dialog.
 
 ---
 
-## Section 7: Close (about 30 seconds)
+## Section 7: Polish (about 60 seconds)
 
-**Say:** "WebMARS v1.0 ships every must-have feature in our PRD plus all six listed stretch goals. The codebase is 103 unit and integration tests, a 345 KB JavaScript bundle, and a strict separation between the simulator core and the React UI so the engine can be tested without mounting any UI. The full project writeup is in docs slash FINAL_REPORT.md, and the supported instruction set, syscalls, and known limitations are in the README. Thanks for watching."
+**Action 1:** Press `Ctrl+Shift+P`.
+**Say:** "Command palette. Every action in the application is reachable from here with fuzzy search. Same pattern as VS Code."
+
+**Action 2:** Type `theme` to filter. Click **Theme: Light**.
+**Say:** "Three themes ship: dark, light, and high contrast. Choice persists across reloads."
+
+**Action 3:** Switch back to dark via the palette or Settings.
+
+**Action 4:** Drag the strip between the source pane and the bottom panel. Then drag the strip between the center pane and the right inspector.
+**Say:** "v1.1 added drag-to-resize between the workspace regions. Sizes persist."
+
+**Action 5:** Resize the browser window narrow, below 768 pixels wide.
+**Say:** "Below 768 pixels the shell switches to a mobile layout: hamburger drawer for menus, four tabs for editor and inspector views, and a control bar at the bottom. The editor is read-only by default but the user can opt into editing through the header toggle."
+
+**Action 6:** Restore the browser width.
+
+---
+
+## Section 8: Close (about 30 seconds)
+
+**Say:** "WebMARS v1.1.0 ships every must-have feature in our PRD plus every listed stretch goal, plus a six-tool Tools menu, an in-app help dialog, drag-to-resize panels, and a real mobile shell. The codebase is 119 unit and integration tests, a 405 KB JavaScript bundle, and a strict separation between the simulator core and the React UI so the engine can be tested without mounting any UI. The deployed build is at webmarsimulator.com. The full project writeup is in docs slash FINAL_REPORT.md, and the supported instruction set is in the README. Thanks for watching."
 
 ---
 
@@ -124,7 +148,8 @@ Total run time: about seven minutes if you do every section. Each section is ind
 
 ## Variants by time budget
 
-- **Two minutes:** Sections 1, 2, and 7 only. Skip examples, debugging, FPU, and polish.
-- **Five minutes:** Sections 1, 2, 3, 4, and 7. Skip FPU and polish. This is the strongest cut for a tight time slot.
-- **Seven minutes:** every section in order, as scripted above.
-- **Ten minutes:** every section, plus open the Tools menu and demo the Instruction Counter, plus enable the delayed-branching toggle and step through a `beq` followed by an `addi` to show the delay slot fire.
+- **Two minutes:** Sections 1, 2, and 8 only. Skip examples, debugging, FPU, tools, and polish.
+- **Five minutes:** Sections 1, 2, 3, 4, and 8. Skip FPU, tools, and polish. This is the strongest cut for a tight time slot.
+- **Seven minutes:** Sections 1, 2, 3, 4, 5, 7, 8. Skip the Tools section.
+- **Nine minutes:** every section in order, as scripted above.
+- **Twelve minutes:** every section, plus enable the delayed-branching toggle and step through a `beq` followed by an `addi` to show the delay slot fire, plus open Tools → Keyboard / Display MMIO and load the MMIO Keyboard Echo example.
