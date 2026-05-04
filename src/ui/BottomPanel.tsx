@@ -38,7 +38,11 @@ export function BottomPanel() {
       aria-label="Bottom panel"
       className={cn(
         'flex min-h-0 flex-col border-t border-divider bg-surface-1',
-        open ? 'h-[200px]' : 'h-7',
+        // Phase 3 SA-5: when open, the parent grid row sets the
+        // height (driven by layoutSizes.bottomPanelHeight via the
+        // ResizeHandle). When closed, fall back to the 28px tab
+        // strip height.
+        open ? 'h-full' : 'h-7',
       )}
     >
       <div role="tablist" aria-label="Bottom panel tabs" className="flex h-7 flex-none items-stretch border-b border-divider">

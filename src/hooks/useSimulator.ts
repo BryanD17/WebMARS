@@ -434,6 +434,39 @@ function writePersistedSimSettings(settings: SimSettings): void {
   } catch { /* ignore */ }
 }
 
+// ─ Phase 3 SA-5: layout sizes ─
+
+const LAYOUT_SIZES_STORAGE_KEY = 'webmars:layout-sizes'
+const DEFAULT_LAYOUT_SIZES = {
+  leftRailWidth:     240,
+  rightPanelWidth:   360,
+  bottomPanelHeight: 200,
+}
+
+function readPersistedLayoutSizes(): typeof DEFAULT_LAYOUT_SIZES {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(LAYOUT_SIZES_STORAGE_KEY)
+    if (raw === null) return { ...DEFAULT_LAYOUT_SIZES }
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return { ...DEFAULT_LAYOUT_SIZES }
+    const obj = parsed as Record<string, unknown>
+    return {
+      leftRailWidth:     typeof obj.leftRailWidth     === 'number' && Number.isFinite(obj.leftRailWidth)     ? obj.leftRailWidth     : DEFAULT_LAYOUT_SIZES.leftRailWidth,
+      rightPanelWidth:   typeof obj.rightPanelWidth   === 'number' && Number.isFinite(obj.rightPanelWidth)   ? obj.rightPanelWidth   : DEFAULT_LAYOUT_SIZES.rightPanelWidth,
+      bottomPanelHeight: typeof obj.bottomPanelHeight === 'number' && Number.isFinite(obj.bottomPanelHeight) ? obj.bottomPanelHeight : DEFAULT_LAYOUT_SIZES.bottomPanelHeight,
+    }
+  } catch {
+    return { ...DEFAULT_LAYOUT_SIZES }
+  }
+}
+
+function writePersistedLayoutSizes(sizes: typeof DEFAULT_LAYOUT_SIZES): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(LAYOUT_SIZES_STORAGE_KEY, JSON.stringify(sizes))
+  } catch { /* ignore */ }
+}
+
 // ─ runtime controls ─
 
 const RUN_SPEED_STORAGE_KEY = 'webmars:run-speed'
@@ -626,6 +659,16 @@ interface SimulatorStoreState {
   commandPaletteOpen: boolean
   openCommandPalette:  () => void
   closeCommandPalette: () => void
+
+  // ─ layoutSizes slice (Phase 3 SA-5; persisted to webmars:layout-sizes) ─
+  // Drag-handle sizes for the three resizable Shell regions. The
+  // numbers are pixel counts and clamped at the handle level.
+  layoutSizes: {
+    leftRailWidth:     number   // expanded width of the left rail
+    rightPanelWidth:   number
+    bottomPanelHeight: number
+  }
+  setLayoutSize: (key: 'leftRailWidth' | 'rightPanelWidth' | 'bottomPanelHeight', value: number) => void
 
   // ─ tools slice (additive; not persisted) ─
   // Engine-side stepCount mirror so panels can subscribe via Zustand
@@ -1158,6 +1201,13 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     commandPaletteOpen: false,
     openCommandPalette:  () => set({ commandPaletteOpen: true  }),
     closeCommandPalette: () => set({ commandPaletteOpen: false }),
+
+    layoutSizes: readPersistedLayoutSizes(),
+    setLayoutSize: (key, value) => {
+      const next = { ...get().layoutSizes, [key]: value }
+      set({ layoutSizes: next })
+      writePersistedLayoutSizes(next)
+    },
 
     instructionsExecuted: 0,
     toolsDialog: null,

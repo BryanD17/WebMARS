@@ -13,6 +13,7 @@ import { DevPanel } from './DevPanel.tsx'
 import { SettingsDialog } from './SettingsDialog.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
 import { InstructionCounter } from './InstructionCounter.tsx'
+import { ResizeHandle } from './ResizeHandle.tsx'
 import { installKeybindings } from '@/lib/keybindings.ts'
 
 // 5-band command-center layout. Workspace columns and rows expand and
@@ -26,6 +27,8 @@ export function Shell() {
   const theme            = useSimulator((s) => s.theme)
   const files            = useSimulator((s) => s.files)
   const activeFileId     = useSimulator((s) => s.activeFileId)
+  const layoutSizes      = useSimulator((s) => s.layoutSizes)
+  const setLayoutSize    = useSimulator((s) => s.setLayoutSize)
   const isMobile         = useIsMobile()
 
   // Apply theme via documentElement.dataset.theme. tokens.css scopes
@@ -74,13 +77,9 @@ export function Shell() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
-  const workspaceCols = rightPanelOpen
-    ? 'grid-cols-[auto_1fr_360px]'
-    : 'grid-cols-[auto_1fr]'
-
-  const centerRows = bottomPanelOpen
-    ? 'grid-rows-[1fr_auto]'
-    : 'grid-rows-[1fr_28px]'
+  // Phase 3 SA-5: layout sizes drive grid templates inline (see the
+  // workspace grid below). The previous static class-based templates
+  // were removed once the dynamic style props landed.
 
   // On mobile (<768px) the shell collapses to a read-only editor +
   // status bar. The toolbar / tab strip / panels all consume too much
@@ -122,12 +121,50 @@ export function Shell() {
         <MenuBar />
         <Toolbar />
         <TabStrip />
-        <div className={`grid min-h-0 ${workspaceCols} overflow-hidden`}>
+        <div
+          className="grid min-h-0 overflow-hidden"
+          style={{
+            gridTemplateColumns: rightPanelOpen
+              ? `auto 1fr 4px ${layoutSizes.rightPanelWidth}px`
+              : 'auto 1fr',
+          }}
+        >
           <LeftRail />
-          <div className={`grid min-h-0 ${centerRows} overflow-hidden`}>
+          <div
+            className="grid min-h-0 overflow-hidden"
+            style={{
+              gridTemplateRows: bottomPanelOpen
+                ? `1fr 4px ${layoutSizes.bottomPanelHeight}px`
+                : '1fr 28px',
+            }}
+          >
             <SourcePane />
+            {bottomPanelOpen && (
+              <ResizeHandle
+                direction="vertical"
+                size={layoutSizes.bottomPanelHeight}
+                min={80}
+                max={600}
+                defaultSize={200}
+                invert
+                onResize={(next) => setLayoutSize('bottomPanelHeight', next)}
+                ariaLabel="Resize bottom panel height"
+              />
+            )}
             <BottomPanel />
           </div>
+          {rightPanelOpen && (
+            <ResizeHandle
+              direction="horizontal"
+              size={layoutSizes.rightPanelWidth}
+              min={280}
+              max={600}
+              defaultSize={360}
+              invert
+              onResize={(next) => setLayoutSize('rightPanelWidth', next)}
+              ariaLabel="Resize right panel width"
+            />
+          )}
           {rightPanelOpen && <RightPanel />}
         </div>
         <StatusBar />
