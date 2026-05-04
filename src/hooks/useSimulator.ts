@@ -670,6 +670,13 @@ interface SimulatorStoreState {
   }
   setLayoutSize: (key: 'leftRailWidth' | 'rightPanelWidth' | 'bottomPanelHeight', value: number) => void
 
+  // ─ help dialog slice (Phase 3 SA-6) ─
+  helpDialogOpen: boolean
+  helpDialogTab:  'basic' | 'pseudo' | 'directives' | 'syscalls' | 'exceptions' | 'about'
+  openHelp:  (tab?: 'basic' | 'pseudo' | 'directives' | 'syscalls' | 'exceptions' | 'about') => void
+  closeHelp: () => void
+  setHelpTab: (tab: 'basic' | 'pseudo' | 'directives' | 'syscalls' | 'exceptions' | 'about') => void
+
   // ─ tools slice (additive; not persisted) ─
   // Engine-side stepCount mirror so panels can subscribe via Zustand
   // without poking _sim. Updated alongside registers in step() and
@@ -1208,6 +1215,12 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       set({ layoutSizes: next })
       writePersistedLayoutSizes(next)
     },
+
+    helpDialogOpen: false,
+    helpDialogTab:  'basic',
+    openHelp:  (tab) => set({ helpDialogOpen: true, ...(tab ? { helpDialogTab: tab } : {}) }),
+    closeHelp: ()    => set({ helpDialogOpen: false }),
+    setHelpTab: (tab) => set({ helpDialogTab: tab }),
 
     instructionsExecuted: 0,
     toolsDialog: null,

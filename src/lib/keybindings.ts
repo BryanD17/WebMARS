@@ -88,6 +88,9 @@ function buildBindings(): Binding[] {
     { combo: 'Ctrl+G', preventDefault: true, run: () => runEditorAction('editor.action.gotoLine') },
     { combo: 'Ctrl+F', preventDefault: true, run: () => runEditorAction('actions.find') },
     { combo: 'Ctrl+H', preventDefault: true, run: () => runEditorAction('editor.action.startFindReplaceAction') },
+
+    // Phase 3 SA-6: F1 opens the help dialog.
+    { combo: 'F1', preventDefault: true, run: () => useSimulator.getState().openHelp() },
   ]
 }
 

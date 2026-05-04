@@ -60,6 +60,7 @@ function buildMenus(actions: {
   backstep: () => void
   reset: () => void
   openCommandPalette: () => void
+  openHelp: (tab?: 'basic' | 'pseudo' | 'directives' | 'syscalls' | 'exceptions' | 'about') => void
 }): ReadonlyArray<MenuDef> {
   // Phase 3 SA-11: external links open in a new tab with proper rel
   // attrs. Internal "in-app destination" items are wired to existing
@@ -167,16 +168,18 @@ function buildMenus(actions: {
   {
     label: 'Help',
     items: [
-      // Until SA-6 lands the dedicated HelpDialog, "Keyboard
-      // Shortcuts" surfaces the command palette which lists every
-      // shortcut next to its action.
-      { kind: 'action', label: 'Keyboard Shortcuts', shortcut: 'Ctrl+Shift+P', onClick: actions.openCommandPalette },
+      { kind: 'action', label: 'Instruction Reference', shortcut: 'F1',         onClick: () => actions.openHelp('basic') },
+      { kind: 'action', label: 'Pseudo-Instructions',                            onClick: () => actions.openHelp('pseudo') },
+      { kind: 'action', label: 'Directives',                                     onClick: () => actions.openHelp('directives') },
+      { kind: 'action', label: 'Syscalls',                                       onClick: () => actions.openHelp('syscalls') },
+      { kind: 'action', label: 'Exceptions',                                     onClick: () => actions.openHelp('exceptions') },
+      { kind: 'separator' },
+      { kind: 'action', label: 'Keyboard Shortcuts', shortcut: 'Ctrl+Shift+P',   onClick: actions.openCommandPalette },
       { kind: 'separator' },
       { kind: 'action', label: 'View on GitHub',    onClick: () => openExternal(REPO_URL) },
       { kind: 'action', label: 'Report a Bug',      onClick: () => openExternal(ISSUES_URL) },
       { kind: 'separator' },
-      // SA-6 will replace this with an in-app About tab.
-      { kind: 'action', label: 'About WebMARS',     onClick: () => openExternal(`${REPO_URL}#webmars`) },
+      { kind: 'action', label: 'About WebMARS',     onClick: () => actions.openHelp('about') },
     ],
   },
   ]
@@ -209,6 +212,7 @@ export function MenuBar() {
   const backstep          = useSimulator((s) => s.backstep)
   const reset             = useSimulator((s) => s.reset)
   const openCommandPalette= useSimulator((s) => s.openCommandPalette)
+  const openHelp          = useSimulator((s) => s.openHelp)
 
   const closeActive = async (): Promise<void> => {
     if (activeFileId !== null) await closeFile(activeFileId)
@@ -234,6 +238,7 @@ export function MenuBar() {
         openInstructionCounter: () => openTool('instructionCounter'),
         assemble, run, pause, step, backstep, reset,
         openCommandPalette,
+        openHelp,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -242,7 +247,7 @@ export function MenuBar() {
       activeFileId, closeFile, closeAll, recentFiles,
       openSettings, setTheme, openTool, setNumberBase,
       assemble, run, pause, step, backstep, reset,
-      openCommandPalette,
+      openCommandPalette, openHelp,
     ],
   )
 

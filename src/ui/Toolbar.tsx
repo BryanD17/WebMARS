@@ -326,6 +326,18 @@ export function Toolbar() {
       {/* Right side: spacer pushes StatusPill to the far edge. */}
       <span className="flex-1" aria-hidden="true" />
 
+      {/* Phase 3 SA-6: ? button opens the help dialog. F1 also
+         opens it via the global keybinding map. */}
+      <button
+        type="button"
+        onClick={() => useSimulator.getState().openHelp()}
+        aria-label="Open help"
+        title="Help (F1)"
+        className="mr-2 flex size-7 items-center justify-center rounded-sm font-mono text-sm text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        ?
+      </button>
+
       <StatusPill />
     </div>
   )

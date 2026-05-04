@@ -13,6 +13,7 @@ import { DevPanel } from './DevPanel.tsx'
 import { SettingsDialog } from './SettingsDialog.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
 import { InstructionCounter } from './InstructionCounter.tsx'
+import { HelpDialog } from './HelpDialog.tsx'
 import { ResizeHandle } from './ResizeHandle.tsx'
 import { installKeybindings } from '@/lib/keybindings.ts'
 
@@ -173,6 +174,7 @@ export function Shell() {
       <SettingsDialog />
       <CommandPalette />
       <InstructionCounter />
+      <HelpDialog />
     </>
   )
 }
