@@ -28,6 +28,8 @@ const MNEMONICS = [
   'j', 'jal', 'jr', 'jalr',
   // Pseudo-instructions
   'li', 'la', 'move', 'blt', 'ble', 'bgt', 'bge', 'neg', 'not', 'nop',
+  // Phase 3 SA-2 additions
+  'abs', 'sge', 'sgt',
   // Syscall
   'syscall',
   // Coprocessor 1 (FPU) — Phase 2B. Dotted mnemonics work because
@@ -121,6 +123,9 @@ const INSTRUCTION_REFERENCE: Record<string, InstructionRef> = {
   neg:    { signature: 'neg $rd, $rs',           desc: 'Negate (pseudo). Expands to "sub $rd, $zero, $rs".' },
   not:    { signature: 'not $rd, $rs',           desc: 'Bitwise NOT (pseudo). Expands to "nor $rd, $rs, $zero".' },
   nop:    { signature: 'nop',                    desc: 'No operation (pseudo). Expands to "sll $zero, $zero, 0".' },
+  abs:    { signature: 'abs $rd, $rs',           desc: 'Absolute value (pseudo). Expands to sra+xor+sub using $at.' },
+  sge:    { signature: 'sge $rd, $rs, $rt',      desc: 'Set if greater or equal (pseudo). Expands to slt + xori 1.' },
+  sgt:    { signature: 'sgt $rd, $rs, $rt',      desc: 'Set if greater than (pseudo). Expands to slt with operands swapped.' },
 
   // Syscall
   syscall: { signature: 'syscall',               desc: 'System call. $v0 selects service; $a0–$a3 carry args. v1.0 supports 1, 4, 5, 8, 10.' },

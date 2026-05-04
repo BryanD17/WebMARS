@@ -113,6 +113,10 @@ export function assemble(source: string): AssembledProgram {
       } else if (tok.type === 'directive') {
         if (tok.value === '.text') { inText = true; }
         else if (tok.value === '.data') { inText = false; }
+        // .globl/.extern: mark mnemonicSeen so the next ident on
+        // this line (the symbol being declared) isn't mis-counted
+        // as a mnemonic. No size impact.
+        else if (tok.value === '.globl' || tok.value === '.extern') { mnemonicSeen = true; }
         else if (!inText) {
           if (tok.value === '.word') {
             let k = j + 1, count = 0;
@@ -160,6 +164,18 @@ export function assemble(source: string): AssembledProgram {
           let imm = 0;
           if (immTok?.type === 'immediate') imm = parseImm(immTok.value);
           textAddr += (imm > 0xffff || imm < -32768) ? 8 : 4;
+        }
+        // ─ Phase 3 SA-2: pseudo-instruction expansion sizes ─
+        // The first pass needs to know how many real instruction
+        // slots each pseudo-op takes so labels following it resolve
+        // to the correct address. Sizes match the second-pass
+        // expansions below.
+        else if (mn === 'blt' || mn === 'ble' || mn === 'bgt' || mn === 'bge') {
+          textAddr += 8; // slt + (beq|bne)
+        } else if (mn === 'sge') {
+          textAddr += 8; // slt + xori
+        } else if (mn === 'abs') {
+          textAddr += 12; // sra + xor + sub
         } else {
           textAddr += 4;
         }
@@ -184,6 +200,14 @@ export function assemble(source: string): AssembledProgram {
         const dir = tok.value;
         if (dir === '.text') { inText = true; j++; continue; }
         if (dir === '.data') { inText = false; j++; continue; }
+        // .globl SYMBOL — single-file assembly treats this as a
+        // no-op. Skip the directive AND the symbol token so the
+        // symbol isn't mistaken for an unknown mnemonic on the next
+        // iteration. Same for .extern.
+        if (dir === '.globl' || dir === '.extern') {
+          j += (toks[j + 1]?.type === 'ident') ? 2 : 1;
+          continue;
+        }
         if (!inText) {
           if (dir === '.asciiz' || dir === '.ascii') {
             const str = toks[j + 1];
@@ -494,6 +518,98 @@ export function assemble(source: string): AssembledProgram {
             consumed = 3; break;
           }
           case 'nop': instr = 0; consumed = 0; break;
+
+          // ─ Phase 3 SA-2: integer pseudo-instructions ─
+          // Each branch pseudo-op expands into slt + (beq|bne).
+          // The second instruction's branch offset is computed from
+          // ITS address (textAddr after the first push), not the
+          // pseudo-op's start address — getBranchOffset() captures
+          // pc at line entry, so we use the bne/beq's actual pc by
+          // computing the offset inline.
+          case 'blt': {
+            // blt $rs, $rt, label → slt $at, $rs, $rt; bne $at, $0, label
+            const rs2 = getR(0); const rt2 = getR(2); const labelTok = nextToks[4];
+            instructions.push(rType(0, rs2, rt2, 1, 0, 0x2a));
+            textAddr += 4; sourceMap.set(textAddr, line);
+            const target = labelTok?.type === 'ident' ? (labels.get(labelTok.value) ?? 0) : getI(4);
+            const off = labelTok?.type === 'ident' ? ((target - textAddr) / 4) & 0xffff : target;
+            if (labelTok?.type === 'ident' && !labels.has(labelTok.value)) {
+              errors.push({ line, message: `Undefined label: ${labelTok.value}` });
+            }
+            instr = iType(0x05, 1, 0, off); consumed = 5; break;
+          }
+          case 'ble': {
+            // ble $rs, $rt, label → slt $at, $rt, $rs; beq $at, $0, label
+            const rs2 = getR(0); const rt2 = getR(2); const labelTok = nextToks[4];
+            instructions.push(rType(0, rt2, rs2, 1, 0, 0x2a));
+            textAddr += 4; sourceMap.set(textAddr, line);
+            const target = labelTok?.type === 'ident' ? (labels.get(labelTok.value) ?? 0) : getI(4);
+            const off = labelTok?.type === 'ident' ? ((target - textAddr) / 4) & 0xffff : target;
+            if (labelTok?.type === 'ident' && !labels.has(labelTok.value)) {
+              errors.push({ line, message: `Undefined label: ${labelTok.value}` });
+            }
+            instr = iType(0x04, 1, 0, off); consumed = 5; break;
+          }
+          case 'bgt': {
+            // bgt $rs, $rt, label → slt $at, $rt, $rs; bne $at, $0, label
+            const rs2 = getR(0); const rt2 = getR(2); const labelTok = nextToks[4];
+            instructions.push(rType(0, rt2, rs2, 1, 0, 0x2a));
+            textAddr += 4; sourceMap.set(textAddr, line);
+            const target = labelTok?.type === 'ident' ? (labels.get(labelTok.value) ?? 0) : getI(4);
+            const off = labelTok?.type === 'ident' ? ((target - textAddr) / 4) & 0xffff : target;
+            if (labelTok?.type === 'ident' && !labels.has(labelTok.value)) {
+              errors.push({ line, message: `Undefined label: ${labelTok.value}` });
+            }
+            instr = iType(0x05, 1, 0, off); consumed = 5; break;
+          }
+          case 'bge': {
+            // bge $rs, $rt, label → slt $at, $rs, $rt; beq $at, $0, label
+            const rs2 = getR(0); const rt2 = getR(2); const labelTok = nextToks[4];
+            instructions.push(rType(0, rs2, rt2, 1, 0, 0x2a));
+            textAddr += 4; sourceMap.set(textAddr, line);
+            const target = labelTok?.type === 'ident' ? (labels.get(labelTok.value) ?? 0) : getI(4);
+            const off = labelTok?.type === 'ident' ? ((target - textAddr) / 4) & 0xffff : target;
+            if (labelTok?.type === 'ident' && !labels.has(labelTok.value)) {
+              errors.push({ line, message: `Undefined label: ${labelTok.value}` });
+            }
+            instr = iType(0x04, 1, 0, off); consumed = 5; break;
+          }
+          case 'abs': {
+            // abs $rd, $rs → sra $at, $rs, 31; xor $rd, $rs, $at; sub $rd, $rd, $at
+            const rd2 = getR(0); const rs2 = getR(2);
+            instructions.push(rType(0, 0, rs2, 1, 31, 0x03));   // sra $at, $rs, 31
+            textAddr += 4; sourceMap.set(textAddr, line);
+            instructions.push(rType(0, rs2, 1, rd2, 0, 0x26));  // xor $rd, $rs, $at
+            textAddr += 4; sourceMap.set(textAddr, line);
+            instr = rType(0, rd2, 1, rd2, 0, 0x22);             // sub $rd, $rd, $at
+            consumed = 3; break;
+          }
+          case 'sge': {
+            // sge $rd, $rs, $rt → slt $rd, $rs, $rt; xori $rd, $rd, 1
+            const rd2 = getR(0); const rs2 = getR(2); const rt2 = getR(4);
+            instructions.push(rType(0, rs2, rt2, rd2, 0, 0x2a));
+            textAddr += 4; sourceMap.set(textAddr, line);
+            instr = iType(0x0e, rd2, rd2, 1);
+            consumed = 5; break;
+          }
+          case 'sgt': {
+            // sgt $rd, $rs, $rt → slt $rd, $rt, $rs (operands swapped)
+            const rd2 = getR(0); const rs2 = getR(2); const rt2 = getR(4);
+            instr = rType(0, rt2, rs2, rd2, 0, 0x2a);
+            consumed = 5; break;
+          }
+          case 'neg': {
+            // neg $rd, $rs → sub $rd, $zero, $rs
+            const rd2 = getR(0); const rs2 = getR(2);
+            instr = rType(0, 0, rs2, rd2, 0, 0x22);
+            consumed = 3; break;
+          }
+          case 'not': {
+            // not $rd, $rs → nor $rd, $rs, $zero
+            const rd2 = getR(0); const rs2 = getR(2);
+            instr = rType(0, rs2, 0, rd2, 0, 0x27);
+            consumed = 3; break;
+          }
 
           // ─ Phase 2F — trap instructions ─
           // Two-operand R-type: teq $rs, $rt → rType(0, rs=getR(0),
