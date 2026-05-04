@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSimulator } from '@/hooks/useSimulator.ts'
 import { SourcePane } from './SourcePane.tsx'
 import { RegisterTable } from './RegisterTable.tsx'
@@ -127,6 +127,42 @@ function DrawerItem({ label, onClick }: { label: string; onClick: () => void }) 
   )
 }
 
+// Phase 3 follow-up: iOS Safari quirk — h-dvh and grid 1fr rows
+// can report 0 height to Monaco's ResizeObserver during the first
+// paint, so the editor mounts at near-zero height and never
+// recovers. Three changes fix the issue:
+//
+// 1. Switch the shell from grid to flex column. Each fixed band is
+//    flex-none with its explicit pixel height; the body is flex-1
+//    min-h-0. flexbox computes height eagerly and fires the
+//    ResizeObserver with a real value on the first frame.
+// 2. Track the visible viewport height with VisualViewport when
+//    available so the URL bar collapsing/expanding doesn't re-trip
+//    the editor sizing.
+// 3. Force a window 'resize' event whenever the active mobile tab
+//    flips to 'editor', which kicks Monaco's listener into a
+//    re-layout if the parent's size changed while it was hidden.
+
+function useViewportHeight(): number {
+  const [h, setH] = useState<number>(() => {
+    if (typeof window === 'undefined') return 800
+    return window.visualViewport?.height ?? window.innerHeight
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    function update(): void {
+      setH(window.visualViewport?.height ?? window.innerHeight)
+    }
+    window.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('resize', update)
+    }
+  }, [])
+  return h
+}
+
 export function MobileShell() {
   const tab               = useSimulator((s) => s.mobileTab)
   const setTab            = useSimulator((s) => s.setMobileTab)
@@ -140,20 +176,33 @@ export function MobileShell() {
   const step              = useSimulator((s) => s.step)
   const reset             = useSimulator((s) => s.reset)
   const status            = useSimulator((s) => s.status)
-  // Local theme state mirrored once for the header swatch; the
-  // real switch lives in the drawer.
-  const [_x] = useState(0)
-  void _x
+
+  const viewportH = useViewportHeight()
+
+  // When the active tab flips to 'editor', dispatch a window resize
+  // event one tick later so Monaco re-measures its parent. Without
+  // this, switching from another tab can leave the editor sized
+  // for the OLD tab's container (which might have been zero).
+  useEffect(() => {
+    if (tab !== 'editor') return
+    const id = window.setTimeout(() => {
+      window.dispatchEvent(new Event('resize'))
+    }, 50)
+    return () => window.clearTimeout(id)
+  }, [tab])
 
   const canPause = status === 'running'
   const canStep  = status === 'ready' || status === 'paused'
 
   return (
     <>
-      <div className="grid h-dvh grid-rows-[56px_36px_1fr_48px_24px] overflow-hidden bg-surface-0 text-ink-1">
+      <div
+        className="flex flex-col overflow-hidden bg-surface-0 text-ink-1"
+        style={{ height: viewportH }}
+      >
         {/* Header */}
         <header
-          className="flex items-center justify-between border-b border-divider bg-surface-1 px-3"
+          className="flex h-14 flex-none items-center justify-between border-b border-divider bg-surface-1 px-3"
           role="banner"
         >
           <div className="flex items-center gap-3">
@@ -184,7 +233,7 @@ export function MobileShell() {
         </header>
 
         {/* Tab strip */}
-        <div role="tablist" aria-label="Mobile view tabs" className="flex items-stretch border-b border-divider bg-surface-1">
+        <div role="tablist" aria-label="Mobile view tabs" className="flex h-9 flex-none items-stretch border-b border-divider bg-surface-1">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -206,13 +255,11 @@ export function MobileShell() {
           ))}
         </div>
 
-        {/* Body — Phase 3 follow-up: relative + min-h-0 + explicit
-           inset-0 child positioning so Monaco's automaticLayout can
-           measure the editor pane on mobile. The previous structure
-           collapsed to a sliver on portrait phones because the grid
-           row's intrinsic size depended on Monaco reporting back its
-           own height (chicken-and-egg). */}
-        <main className="relative min-h-0 overflow-hidden">
+        {/* Body — flex-1 + min-h-0 gives Monaco a real-pixel parent
+           that ResizeObserver can measure on the first frame. The
+           inactive tabs use position:absolute so they don't affect
+           the active tab's intrinsic height. */}
+        <main className="relative flex-1 min-h-0 overflow-hidden">
           <div hidden={tab !== 'editor'}    className={cn('absolute inset-0', tab !== 'editor'    && 'hidden')}><SourcePane /></div>
           <div hidden={tab !== 'registers'} className={cn('absolute inset-0 overflow-y-auto px-3 py-2', tab !== 'registers' && 'hidden')}><RegisterTable /></div>
           <div hidden={tab !== 'memory'}    className={cn('absolute inset-0 overflow-y-auto px-3 py-2', tab !== 'memory'    && 'hidden')}><MemoryPanel /></div>
@@ -222,7 +269,7 @@ export function MobileShell() {
         {/* Control bar */}
         <nav
           aria-label="Simulator controls"
-          className="flex items-stretch divide-x divide-divider border-t border-divider bg-surface-1"
+          className="flex h-12 flex-none items-stretch divide-x divide-divider border-t border-divider bg-surface-1"
         >
           <ControlBarButton label="Assemble" onClick={assemble} />
           <ControlBarButton label="Run"      onClick={run} />
@@ -231,7 +278,9 @@ export function MobileShell() {
           <ControlBarButton label="Reset"    onClick={reset} />
         </nav>
 
-        <StatusBar />
+        <div className="h-6 flex-none">
+          <StatusBar />
+        </div>
       </div>
 
       <Drawer open={drawerOpen} onClose={toggleDrawer} />
