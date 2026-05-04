@@ -71,6 +71,18 @@ export class Simulator {
     this.memory.setAllowTextWrites(on)
   }
 
+  // Phase 3 SA-13 — MMIO bridges. Tools install a transmitter
+  // handler to receive characters that the program writes to
+  // 0xffff000c, and call pushMmioKey to deliver keystrokes to the
+  // receiver at 0xffff0000/0xffff0004.
+  setMmioTransmitterHandler(handler: ((char: number) => void) | null): void {
+    this.memory.onTransmitterWrite = handler
+  }
+
+  pushMmioKey(char: number): void {
+    this.memory.mmioPushKey(char)
+  }
+
   // Branch/jump dispatch. Called from execute(); routes through
   // pendingBranchTarget when delayed branching is on so the next
   // step()'s instruction (the delay slot) runs before the target

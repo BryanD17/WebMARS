@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSimulator, type RecentFile, type ThemeName } from '@/hooks/useSimulator.ts'
+import { useSimulator, type RecentFile, type ThemeName, type NumberBase } from '@/hooks/useSimulator.ts'
+import { runEditorAction } from '@/lib/editorActions.ts'
+import { REPO_URL, ISSUES_URL } from '@/lib/constants.ts'
 import { cn } from './cn.ts'
 
 // Each menu item is either a clickable action, a disabled placeholder
@@ -48,8 +50,29 @@ function buildMenus(actions: {
   recentFiles: ReadonlyArray<RecentFile>
   openSettings: () => void
   setTheme: (next: ThemeName) => void
+  setNumberBase: (next: NumberBase) => void
   openInstructionCounter: () => void
+  openTool: (id: 'bitmap' | 'mmio' | 'fpRepr' | 'memRef') => void
+  openPlaceholder: (name: string) => void
+  toggleScreenMagnifier: () => void
+  // Phase 3 SA-9 / SA-11 wiring
+  assemble: () => void
+  run: () => void
+  pause: () => void
+  step: () => void
+  backstep: () => void
+  reset: () => void
+  openCommandPalette: () => void
+  openHelp: (tab?: 'basic' | 'pseudo' | 'directives' | 'syscalls' | 'exceptions' | 'about') => void
 }): ReadonlyArray<MenuDef> {
+  // Phase 3 SA-11: external links open in a new tab with proper rel
+  // attrs. Internal "in-app destination" items are wired to existing
+  // dialog opens (Settings, command palette) until SA-6 ships the
+  // dedicated HelpDialog.
+  function openExternal(url: string): void {
+    if (typeof window === 'undefined') return
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
   // Build the File menu's "Open Recent" section dynamically from the
   // store's recentFiles array. Each entry is a menuitem labeled with
   // the filename + a relative timestamp; clicking re-opens the file
@@ -86,14 +109,14 @@ function buildMenus(actions: {
   {
     label: 'Edit',
     items: [
-      { kind: 'action', label: 'Undo',             shortcut: 'Ctrl+Z',       disabled: true },
-      { kind: 'action', label: 'Redo',             shortcut: 'Ctrl+Shift+Z', disabled: true },
+      { kind: 'action', label: 'Undo',             shortcut: 'Ctrl+Z',       onClick: () => runEditorAction('undo') },
+      { kind: 'action', label: 'Redo',             shortcut: 'Ctrl+Shift+Z', onClick: () => runEditorAction('redo') },
       { kind: 'separator' },
-      { kind: 'action', label: 'Find',             shortcut: 'Ctrl+F',       disabled: true },
-      { kind: 'action', label: 'Replace',          shortcut: 'Ctrl+H',       disabled: true },
-      { kind: 'action', label: 'Go to Line…',      shortcut: 'Ctrl+G',       disabled: true },
+      { kind: 'action', label: 'Find',             shortcut: 'Ctrl+F',       onClick: () => runEditorAction('actions.find') },
+      { kind: 'action', label: 'Replace',          shortcut: 'Ctrl+H',       onClick: () => runEditorAction('editor.action.startFindReplaceAction') },
+      { kind: 'action', label: 'Go to Line…',      shortcut: 'Ctrl+G',       onClick: () => runEditorAction('editor.action.gotoLine') },
       { kind: 'separator' },
-      { kind: 'action', label: 'Toggle Line Comment', shortcut: 'Ctrl+/',    disabled: true },
+      { kind: 'action', label: 'Toggle Line Comment', shortcut: 'Ctrl+/',    onClick: () => runEditorAction('editor.action.commentLine') },
     ],
   },
   {
@@ -103,32 +126,45 @@ function buildMenus(actions: {
       { kind: 'action', label: 'Toggle Right Panel',   shortcut: 'Ctrl+Alt+B', onClick: actions.toggleRightPanel  },
       { kind: 'action', label: 'Toggle Bottom Panel',  shortcut: 'Ctrl+J',     onClick: actions.toggleBottomPanel },
       { kind: 'separator' },
-      { kind: 'action', label: 'Number Base · Hex',                            disabled: true },
-      { kind: 'action', label: 'Number Base · Dec',                            disabled: true },
-      { kind: 'action', label: 'Number Base · Bin',                            disabled: true },
+      // Phase 3 SA-9: View menu also surfaces the editor's find UI
+      // for users who don't know the keyboard shortcut.
+      { kind: 'action', label: 'Find / Replace Bar',  shortcut: 'Ctrl+G',     onClick: () => runEditorAction('actions.find') },
+      { kind: 'separator' },
+      { kind: 'action', label: 'Number Base · Hex',  onClick: () => actions.setNumberBase('hex') },
+      { kind: 'action', label: 'Number Base · Dec',  onClick: () => actions.setNumberBase('dec') },
+      { kind: 'action', label: 'Number Base · Bin',  onClick: () => actions.setNumberBase('bin') },
     ],
   },
   {
     label: 'Run',
     items: [
-      { kind: 'action', label: 'Assemble',         shortcut: 'F3',        disabled: true },
-      { kind: 'action', label: 'Run',              shortcut: 'F5',        disabled: true },
-      { kind: 'action', label: 'Pause',            shortcut: 'F6',        disabled: true },
-      { kind: 'action', label: 'Step',             shortcut: 'F7',        disabled: true },
-      { kind: 'action', label: 'Backstep',         shortcut: 'Shift+F7',  disabled: true },
+      { kind: 'action', label: 'Assemble',         shortcut: 'F3',        onClick: actions.assemble },
+      { kind: 'action', label: 'Run',              shortcut: 'F5',        onClick: actions.run },
+      { kind: 'action', label: 'Pause',            shortcut: 'F6',        onClick: actions.pause },
+      { kind: 'action', label: 'Step',             shortcut: 'F7',        onClick: actions.step },
+      { kind: 'action', label: 'Backstep',         shortcut: 'Shift+F7',  onClick: actions.backstep },
       { kind: 'action', label: 'Run to Cursor',    shortcut: 'F8',        disabled: true },
       { kind: 'action', label: 'Toggle Breakpoint',shortcut: 'F9',        disabled: true },
       { kind: 'separator' },
-      { kind: 'action', label: 'Reset',            shortcut: 'Ctrl+R',    disabled: true },
+      { kind: 'action', label: 'Reset',                                    onClick: actions.reset },
     ],
   },
   {
     label: 'Tools',
     items: [
-      { kind: 'action', label: 'Instruction Counter', onClick: actions.openInstructionCounter },
+      { kind: 'action', label: 'Instruction Counter',          onClick: actions.openInstructionCounter },
+      { kind: 'action', label: 'Bitmap Display',               onClick: () => actions.openTool('bitmap') },
+      { kind: 'action', label: 'Keyboard / Display MMIO',      onClick: () => actions.openTool('mmio') },
+      { kind: 'action', label: 'Floating-Point Representation',onClick: () => actions.openTool('fpRepr') },
+      { kind: 'action', label: 'Memory Reference Visualization',onClick: () => actions.openTool('memRef') },
+      { kind: 'action', label: 'Screen Magnifier',             onClick: actions.toggleScreenMagnifier },
       { kind: 'separator' },
-      { kind: 'action', label: 'Cache Simulator (Phase 3)',                 disabled: true },
-      { kind: 'action', label: 'Memory Reference Visualization (Phase 3)',  disabled: true },
+      { kind: 'action', label: 'Data Cache Simulator',         onClick: () => actions.openPlaceholder('Data Cache Simulator') },
+      { kind: 'action', label: 'MIPS X-Ray',                   onClick: () => actions.openPlaceholder('MIPS X-Ray') },
+      { kind: 'action', label: 'BHT Simulator',                onClick: () => actions.openPlaceholder('BHT Simulator') },
+      { kind: 'action', label: 'Digital Lab Sim',              onClick: () => actions.openPlaceholder('Digital Lab Sim') },
+      { kind: 'action', label: 'Scavenger Hunt',               onClick: () => actions.openPlaceholder('Scavenger Hunt') },
+      { kind: 'action', label: 'Mars Bot',                     onClick: () => actions.openPlaceholder('Mars Bot') },
     ],
   },
   {
@@ -144,10 +180,18 @@ function buildMenus(actions: {
   {
     label: 'Help',
     items: [
-      { kind: 'action', label: 'Keyboard Shortcuts', shortcut: '?',  disabled: true },
+      { kind: 'action', label: 'Instruction Reference', shortcut: 'F1',         onClick: () => actions.openHelp('basic') },
+      { kind: 'action', label: 'Pseudo-Instructions',                            onClick: () => actions.openHelp('pseudo') },
+      { kind: 'action', label: 'Directives',                                     onClick: () => actions.openHelp('directives') },
+      { kind: 'action', label: 'Syscalls',                                       onClick: () => actions.openHelp('syscalls') },
+      { kind: 'action', label: 'Exceptions',                                     onClick: () => actions.openHelp('exceptions') },
       { kind: 'separator' },
-      { kind: 'action', label: 'GitHub Repository',                  disabled: true },
-      { kind: 'action', label: 'About WebMARS',                      disabled: true },
+      { kind: 'action', label: 'Keyboard Shortcuts', shortcut: 'Ctrl+Shift+P',   onClick: actions.openCommandPalette },
+      { kind: 'separator' },
+      { kind: 'action', label: 'View on GitHub',    onClick: () => openExternal(REPO_URL) },
+      { kind: 'action', label: 'Report a Bug',      onClick: () => openExternal(ISSUES_URL) },
+      { kind: 'separator' },
+      { kind: 'action', label: 'About WebMARS',     onClick: () => actions.openHelp('about') },
     ],
   },
   ]
@@ -172,6 +216,17 @@ export function MenuBar() {
   const openSettings      = useSimulator((s) => s.openSettings)
   const setTheme          = useSimulator((s) => s.setTheme)
   const openTool          = useSimulator((s) => s.openTool)
+  const openPlaceholderTool = useSimulator((s) => s.openPlaceholderTool)
+  const toggleScreenMagnifier = useSimulator((s) => s.toggleScreenMagnifier)
+  const setNumberBase     = useSimulator((s) => s.setNumberBase)
+  const assemble          = useSimulator((s) => s.assemble)
+  const run               = useSimulator((s) => s.run)
+  const pause             = useSimulator((s) => s.pause)
+  const step              = useSimulator((s) => s.step)
+  const backstep          = useSimulator((s) => s.backstep)
+  const reset             = useSimulator((s) => s.reset)
+  const openCommandPalette= useSimulator((s) => s.openCommandPalette)
+  const openHelp          = useSimulator((s) => s.openHelp)
 
   const closeActive = async (): Promise<void> => {
     if (activeFileId !== null) await closeFile(activeFileId)
@@ -193,14 +248,24 @@ export function MenuBar() {
         recentFiles,
         openSettings,
         setTheme,
+        setNumberBase,
         openInstructionCounter: () => openTool('instructionCounter'),
+        openTool,
+        openPlaceholder: openPlaceholderTool,
+        toggleScreenMagnifier,
+        assemble, run, pause, step, backstep, reset,
+        openCommandPalette,
+        openHelp,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       toggleLeftRail, toggleRightPanel, toggleBottomPanel,
       newFile, openFromDisk, saveActive, saveActiveAs, saveAll,
       activeFileId, closeFile, closeAll, recentFiles,
-      openSettings, setTheme, openTool,
+      openSettings, setTheme, openTool, setNumberBase,
+      assemble, run, pause, step, backstep, reset,
+      openCommandPalette, openHelp,
+      openPlaceholderTool, toggleScreenMagnifier,
     ],
   )
 
@@ -270,7 +335,7 @@ export function MenuBar() {
               <div
                 role="menu"
                 aria-label={menu.label}
-                className="absolute left-0 top-full z-40 mt-1 min-w-[14rem] rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
+                className="absolute left-0 top-full z-40 mt-1 min-w-[14rem] max-h-[60vh] overflow-y-auto rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
               >
                 {menu.items.map((item, j) => {
                   if (item.kind === 'separator') {

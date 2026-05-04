@@ -52,6 +52,7 @@ const EXAMPLES: ReadonlyArray<{ id: ExampleName; label: string; desc: string }> 
   { id: 'sumToN',      label: 'Sum 1..N',          desc: 'read N, print 1+2+…+N' },
   { id: 'syscallIO',   label: 'Syscall I/O',       desc: 'read int, print int (full I/O)' },
   { id: 'floatMath',   label: 'Float Math (FPU)',  desc: 'sqrt(3² + 4²) via mtc1/cvt.s.w/mul.s' },
+  { id: 'mmioEcho',    label: 'MMIO Keyboard Echo',desc: 'poll receiver, echo to transmitter' },
 ]
 
 function ExamplesDropdown() {
@@ -103,7 +104,7 @@ function ExamplesDropdown() {
         <div
           role="menu"
           aria-label="Load example program"
-          className="absolute left-0 top-full z-40 mt-1 min-w-[18rem] rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
+          className="absolute left-0 top-full z-40 mt-1 min-w-[18rem] max-h-[60vh] overflow-y-auto rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
         >
           {EXAMPLES.map((example) => (
             <button
@@ -325,6 +326,18 @@ export function Toolbar() {
 
       {/* Right side: spacer pushes StatusPill to the far edge. */}
       <span className="flex-1" aria-hidden="true" />
+
+      {/* Phase 3 SA-6: ? button opens the help dialog. F1 also
+         opens it via the global keybinding map. */}
+      <button
+        type="button"
+        onClick={() => useSimulator.getState().openHelp()}
+        aria-label="Open help"
+        title="Help (F1)"
+        className="mr-2 flex size-7 items-center justify-center rounded-sm font-mono text-sm text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        ?
+      </button>
 
       <StatusPill />
     </div>

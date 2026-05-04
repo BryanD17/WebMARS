@@ -13,6 +13,15 @@ import { DevPanel } from './DevPanel.tsx'
 import { SettingsDialog } from './SettingsDialog.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
 import { InstructionCounter } from './InstructionCounter.tsx'
+import { HelpDialog } from './HelpDialog.tsx'
+import { MobileShell } from './MobileShell.tsx'
+import { BitmapDisplay } from './tools/BitmapDisplay.tsx'
+import { KeyboardDisplayMmio } from './tools/KeyboardDisplayMmio.tsx'
+import { FpRepresentation } from './tools/FpRepresentation.tsx'
+import { MemoryRefViz } from './tools/MemoryRefViz.tsx'
+import { ScreenMagnifier } from './tools/ScreenMagnifier.tsx'
+import { PlaceholderTool } from './tools/PlaceholderTool.tsx'
+import { ResizeHandle } from './ResizeHandle.tsx'
 import { installKeybindings } from '@/lib/keybindings.ts'
 
 // 5-band command-center layout. Workspace columns and rows expand and
@@ -26,6 +35,8 @@ export function Shell() {
   const theme            = useSimulator((s) => s.theme)
   const files            = useSimulator((s) => s.files)
   const activeFileId     = useSimulator((s) => s.activeFileId)
+  const layoutSizes      = useSimulator((s) => s.layoutSizes)
+  const setLayoutSize    = useSimulator((s) => s.setLayoutSize)
   const isMobile         = useIsMobile()
 
   // Apply theme via documentElement.dataset.theme. tokens.css scopes
@@ -74,43 +85,18 @@ export function Shell() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
-  const workspaceCols = rightPanelOpen
-    ? 'grid-cols-[auto_1fr_360px]'
-    : 'grid-cols-[auto_1fr]'
+  // Phase 3 SA-5: layout sizes drive grid templates inline (see the
+  // workspace grid below). The previous static class-based templates
+  // were removed once the dynamic style props landed.
 
-  const centerRows = bottomPanelOpen
-    ? 'grid-rows-[1fr_auto]'
-    : 'grid-rows-[1fr_28px]'
-
-  // On mobile (<768px) the shell collapses to a read-only editor +
-  // status bar. The toolbar / tab strip / panels all consume too much
-  // vertical space at phone widths to be useful, and Monaco runs in
-  // readOnly mode so write affordances would just be confusing.
+  // Phase 3 SA-16: under 768px viewport, the desktop shell is
+  // unusable. MobileShell provides a fundamentally different layout:
+  // header with hamburger drawer, tab strip (Editor / Registers /
+  // Memory / Console), tab body, and a control bar at the bottom.
   if (isMobile) {
     return (
       <>
-        <div className="grid h-dvh grid-rows-[32px_36px_1fr_24px] overflow-hidden bg-surface-0 text-ink-1">
-          <header
-            className="flex items-center gap-2 border-b border-divider bg-surface-1 px-3 font-display text-xs text-ink-1"
-            style={{ letterSpacing: '0.04em' }}
-            role="banner"
-          >
-            <span aria-hidden="true" className="size-2 bg-accent" />
-            WebMARS
-            <span className="ml-2 truncate text-[10px] uppercase text-ink-3" style={{ letterSpacing: '0.06em' }}>
-              read-only mode
-            </span>
-          </header>
-          <div
-            role="status"
-            className="flex items-center gap-2 border-b border-divider bg-surface-2 px-3 text-[11px] text-ink-2"
-          >
-            <span aria-hidden="true" className="text-warn">⚠</span>
-            <span>Open in a desktop browser to edit, assemble, and run programs.</span>
-          </div>
-          <SourcePane />
-          <StatusBar />
-        </div>
+        <MobileShell />
         {import.meta.env.DEV && <DevPanel />}
       </>
     )
@@ -122,12 +108,50 @@ export function Shell() {
         <MenuBar />
         <Toolbar />
         <TabStrip />
-        <div className={`grid min-h-0 ${workspaceCols} overflow-hidden`}>
+        <div
+          className="grid min-h-0 overflow-hidden"
+          style={{
+            gridTemplateColumns: rightPanelOpen
+              ? `auto 1fr 4px ${layoutSizes.rightPanelWidth}px`
+              : 'auto 1fr',
+          }}
+        >
           <LeftRail />
-          <div className={`grid min-h-0 ${centerRows} overflow-hidden`}>
+          <div
+            className="grid min-h-0 overflow-hidden"
+            style={{
+              gridTemplateRows: bottomPanelOpen
+                ? `1fr 4px ${layoutSizes.bottomPanelHeight}px`
+                : '1fr 28px',
+            }}
+          >
             <SourcePane />
+            {bottomPanelOpen && (
+              <ResizeHandle
+                direction="vertical"
+                size={layoutSizes.bottomPanelHeight}
+                min={80}
+                max={600}
+                defaultSize={200}
+                invert
+                onResize={(next) => setLayoutSize('bottomPanelHeight', next)}
+                ariaLabel="Resize bottom panel height"
+              />
+            )}
             <BottomPanel />
           </div>
+          {rightPanelOpen && (
+            <ResizeHandle
+              direction="horizontal"
+              size={layoutSizes.rightPanelWidth}
+              min={280}
+              max={600}
+              defaultSize={360}
+              invert
+              onResize={(next) => setLayoutSize('rightPanelWidth', next)}
+              ariaLabel="Resize right panel width"
+            />
+          )}
           {rightPanelOpen && <RightPanel />}
         </div>
         <StatusBar />
@@ -136,6 +160,13 @@ export function Shell() {
       <SettingsDialog />
       <CommandPalette />
       <InstructionCounter />
+      <HelpDialog />
+      <BitmapDisplay />
+      <KeyboardDisplayMmio />
+      <FpRepresentation />
+      <MemoryRefViz />
+      <PlaceholderTool />
+      <ScreenMagnifier />
     </>
   )
 }

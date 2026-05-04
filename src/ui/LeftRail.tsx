@@ -21,14 +21,16 @@ const RAIL_ICONS: ReadonlyArray<RailIcon> = [
 
 // Reads leftRailExpanded + leftPanelKey from the layout slice.
 // Collapsed = 48px icon rail; expanded = 240px (icon column + the
-// active panel rendered to its right). Clicking a wired icon
-// (currently only Breakpoints from SA-9) sets leftPanelKey AND
-// expands the rail; subsequent clicks on the same icon collapse.
+// active panel rendered to its right). Clicking a wired icon sets
+// leftPanelKey AND expands the rail; subsequent clicks on the same
+// icon collapse. The bottom anchor holds a settings cog (Phase 3
+// SA-7) and the rail collapse toggle.
 export function LeftRail() {
   const expanded     = useSimulator((s) => s.leftRailExpanded)
   const panelKey     = useSimulator((s) => s.leftPanelKey)
   const toggleExpand = useSimulator((s) => s.toggleLeftRail)
   const setPanel     = useSimulator((s) => s.setLeftPanel)
+  const openSettings = useSimulator((s) => s.openSettings)
 
   function handleIconClick(icon: RailIcon): void {
     if (icon.futureSubAgent !== undefined) return
@@ -80,11 +82,24 @@ export function LeftRail() {
 
         <span className="flex-1" aria-hidden="true" />
 
+        {/* Phase 3 SA-7: Settings cog at the bottom of the rail
+           opens the Settings dialog. Same behaviour as Settings →
+           Open Settings… in the menu bar. */}
+        <button
+          type="button"
+          onClick={openSettings}
+          aria-label="Open settings"
+          title="Settings (Ctrl+,)"
+          className="flex size-8 items-center justify-center rounded-sm font-mono text-base text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+        >
+          ⚙
+        </button>
+
         <button
           type="button"
           onClick={toggleExpand}
           aria-label={expanded ? 'Collapse left rail' : 'Expand left rail'}
-          title={expanded ? 'Collapse left rail (Ctrl+B — wired in SA-14)' : 'Expand left rail (Ctrl+B — wired in SA-14)'}
+          title={expanded ? 'Collapse left rail (Ctrl+B)' : 'Expand left rail (Ctrl+B)'}
           className="flex size-8 items-center justify-center rounded-sm font-mono text-xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
         >
           {expanded ? '◀' : '▶'}

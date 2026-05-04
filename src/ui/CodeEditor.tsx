@@ -6,6 +6,7 @@ import { useIsMobile } from '@/hooks/useIsMobile.ts'
 import { registerMips } from '@/lib/mipsLanguage.ts'
 import { JUMP_TO_LINE_EVENT, type JumpToLineDetail } from '@/lib/jumpToLine.ts'
 import { setEditorCursorReader } from '@/lib/editorCursor.ts'
+import { setEditorActionRunner } from '@/lib/editorActions.ts'
 
 // Wraps @monaco-editor/react with the WebMARS MIPS language + dark
 // theme + IDE-density editor options. Replaces SourcePane's previous
@@ -26,11 +27,15 @@ export function CodeEditor() {
   const assemblerErrors  = useSimulator((s) => s.assemblerErrors)
   const breakpoints      = useSimulator((s) => s.breakpoints)
   const editorFontSize   = useSimulator((s) => s.editorFontSize)
+  const mobileEditAllowed= useSimulator((s) => s.mobileEditAllowed)
   const isMobile         = useIsMobile()
 
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
   const breakpointDecorationsRef = useRef<string[]>([])
+  // Phase 3 SA-8: separate decoration set for the hover preview so it
+  // doesn't collide with real breakpoint decorations on the same line.
+  const hoverPreviewDecorationsRef = useRef<string[]>([])
 
   function handleBeforeMount(monaco: Monaco): void {
     registerMips(monaco)
@@ -55,10 +60,57 @@ export function CodeEditor() {
       }
     })
 
+    // Phase 3 SA-8: low-opacity preview on gutter hover so users
+    // see WHERE they can click before committing a breakpoint.
+    // Skip lines that already have a breakpoint (the real glyph
+    // is more informative than the preview).
+    editor.onMouseMove((event) => {
+      if (event.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+        const line = event.target.position?.lineNumber
+        const existing = useSimulator.getState().breakpoints
+        if (typeof line === 'number' && !existing.has(line)) {
+          hoverPreviewDecorationsRef.current = editor.deltaDecorations(
+            hoverPreviewDecorationsRef.current,
+            [{
+              range: new monaco.Range(line, 1, line, 1),
+              options: { glyphMarginClassName: 'webmars-breakpoint-glyph-preview' },
+            }],
+          )
+          return
+        }
+      }
+      // Off-gutter or over an existing breakpoint — clear any preview.
+      if (hoverPreviewDecorationsRef.current.length > 0) {
+        hoverPreviewDecorationsRef.current = editor.deltaDecorations(
+          hoverPreviewDecorationsRef.current, [],
+        )
+      }
+    })
+
+    // Clear the preview decoration when the mouse leaves the editor
+    // entirely (Monaco's onMouseMove fires only over the editor body).
+    editor.onMouseLeave(() => {
+      if (hoverPreviewDecorationsRef.current.length > 0) {
+        hoverPreviewDecorationsRef.current = editor.deltaDecorations(
+          hoverPreviewDecorationsRef.current, [],
+        )
+      }
+    })
+
     // Register the cursor reader so the toolbar's Run-to-cursor
     // button can snapshot the current cursor line without holding
     // a Monaco ref of its own.
     setEditorCursorReader(() => editor.getPosition()?.lineNumber ?? null)
+
+    // Phase 3 SA-9: register an action runner so the global key map
+    // and menu items can trigger Monaco built-ins (gotoLine, find,
+    // replace) even when the editor isn't the current focus owner.
+    // Focusing first guarantees the action's UI lands in the right
+    // place.
+    setEditorActionRunner((actionId) => {
+      editor.focus()
+      editor.trigger('webmars-keybindings', actionId, null)
+    })
   }
 
   // Apply / clear assembler-error markers whenever the error array
@@ -145,13 +197,16 @@ export function CodeEditor() {
         // ~1.5x which keeps the gutter glyph centered as the user
         // resizes via the settings dialog.
         lineHeight: 0,
-        readOnly: isMobile,
+        // Phase 3 SA-16: mobile is read-only by default but the user
+        // can opt into editing via the header toggle. Word wrap and
+        // minimap also adapt to phone widths.
+        readOnly: isMobile && !mobileEditAllowed,
+        wordWrap: isMobile ? 'on' : 'off',
+        minimap: { enabled: !isMobile, side: 'right', renderCharacters: false },
         lineNumbers: 'on',
         rulers: [80],
-        minimap: { enabled: true, side: 'right', renderCharacters: false },
         tabSize: 4,
         insertSpaces: true,
-        wordWrap: 'off',
         glyphMargin: true,           // SA-9 attaches breakpoint glyphs here
         folding: true,
         automaticLayout: true,       // resizes when right/bottom panel toggles

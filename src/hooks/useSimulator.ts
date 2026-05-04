@@ -26,6 +26,7 @@ import stringPrintSource from '../examples/stringPrint.asm?raw'
 import sumToNSource      from '../examples/sumToN.asm?raw'
 import syscallIOSource   from '../examples/syscallIO.asm?raw'
 import floatMathSource   from '../examples/floatMath.asm?raw'
+import mmioEchoSource    from '../examples/mmioEcho.asm?raw'
 
 // Canonical MIPS / real-MARS conventions: program text starts at
 // 0x00400000 and the stack pointer initializes at 0x7FFFEFFC (top of
@@ -212,7 +213,7 @@ function computeInitialLayout(): PersistedLayout {
 // keep reading from one place.
 
 export type ExampleName =
-  | 'arraySum' | 'factorial' | 'stringPrint' | 'sumToN' | 'syscallIO' | 'floatMath'
+  | 'arraySum' | 'factorial' | 'stringPrint' | 'sumToN' | 'syscallIO' | 'floatMath' | 'mmioEcho'
 
 export interface FileEntry {
   id: string
@@ -234,6 +235,7 @@ const EXAMPLE_SOURCES: Record<ExampleName, string> = {
   sumToN:      sumToNSource,
   syscallIO:   syscallIOSource,
   floatMath:   floatMathSource,
+  mmioEcho:    mmioEchoSource,
 }
 
 const RECENT_FILES_KEY = 'webmars:recent-files'
@@ -434,6 +436,39 @@ function writePersistedSimSettings(settings: SimSettings): void {
   } catch { /* ignore */ }
 }
 
+// ─ Phase 3 SA-5: layout sizes ─
+
+const LAYOUT_SIZES_STORAGE_KEY = 'webmars:layout-sizes'
+const DEFAULT_LAYOUT_SIZES = {
+  leftRailWidth:     240,
+  rightPanelWidth:   360,
+  bottomPanelHeight: 200,
+}
+
+function readPersistedLayoutSizes(): typeof DEFAULT_LAYOUT_SIZES {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(LAYOUT_SIZES_STORAGE_KEY)
+    if (raw === null) return { ...DEFAULT_LAYOUT_SIZES }
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return { ...DEFAULT_LAYOUT_SIZES }
+    const obj = parsed as Record<string, unknown>
+    return {
+      leftRailWidth:     typeof obj.leftRailWidth     === 'number' && Number.isFinite(obj.leftRailWidth)     ? obj.leftRailWidth     : DEFAULT_LAYOUT_SIZES.leftRailWidth,
+      rightPanelWidth:   typeof obj.rightPanelWidth   === 'number' && Number.isFinite(obj.rightPanelWidth)   ? obj.rightPanelWidth   : DEFAULT_LAYOUT_SIZES.rightPanelWidth,
+      bottomPanelHeight: typeof obj.bottomPanelHeight === 'number' && Number.isFinite(obj.bottomPanelHeight) ? obj.bottomPanelHeight : DEFAULT_LAYOUT_SIZES.bottomPanelHeight,
+    }
+  } catch {
+    return { ...DEFAULT_LAYOUT_SIZES }
+  }
+}
+
+function writePersistedLayoutSizes(sizes: typeof DEFAULT_LAYOUT_SIZES): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(LAYOUT_SIZES_STORAGE_KEY, JSON.stringify(sizes))
+  } catch { /* ignore */ }
+}
+
 // ─ runtime controls ─
 
 const RUN_SPEED_STORAGE_KEY = 'webmars:run-speed'
@@ -522,6 +557,13 @@ interface SimulatorStoreState {
   assemblerErrors: AssemblerError[]
   runtimeError: RuntimeError | null
   inspectorTab: InspectorTab
+
+  // ─ Phase 3 SA-1: source-of-truth console buffer ─
+  // The simulator's print() callback appends here; consoleOutput is
+  // derived (split on '\n') so legacy code keeps working. Avoids the
+  // first-byte loss caused by render-timing races against per-call
+  // array allocation.
+  consoleBuffer: string
 
   // ─ contract actions ─
   setSource: (next: string) => void
@@ -620,14 +662,70 @@ interface SimulatorStoreState {
   openCommandPalette:  () => void
   closeCommandPalette: () => void
 
+  // ─ layoutSizes slice (Phase 3 SA-5; persisted to webmars:layout-sizes) ─
+  // Drag-handle sizes for the three resizable Shell regions. The
+  // numbers are pixel counts and clamped at the handle level.
+  layoutSizes: {
+    leftRailWidth:     number   // expanded width of the left rail
+    rightPanelWidth:   number
+    bottomPanelHeight: number
+  }
+  setLayoutSize: (key: 'leftRailWidth' | 'rightPanelWidth' | 'bottomPanelHeight', value: number) => void
+
+  // ─ help dialog slice (Phase 3 SA-6) ─
+  helpDialogOpen: boolean
+  helpDialogTab:  'basic' | 'pseudo' | 'directives' | 'syscalls' | 'exceptions' | 'about'
+  openHelp:  (tab?: 'basic' | 'pseudo' | 'directives' | 'syscalls' | 'exceptions' | 'about') => void
+  closeHelp: () => void
+  setHelpTab: (tab: 'basic' | 'pseudo' | 'directives' | 'syscalls' | 'exceptions' | 'about') => void
+
   // ─ tools slice (additive; not persisted) ─
   // Engine-side stepCount mirror so panels can subscribe via Zustand
   // without poking _sim. Updated alongside registers in step() and
   // run(); reset to 0 by reset() / assemble().
   instructionsExecuted: number
-  toolsDialog: 'instructionCounter' | null
-  openTool:  (which: 'instructionCounter') => void
+  toolsDialog: 'instructionCounter' | 'bitmap' | 'mmio' | 'fpRepr' | 'memRef' | 'placeholder' | null
+  toolsPlaceholderName: string
+  openTool:  (which: 'instructionCounter' | 'bitmap' | 'mmio' | 'fpRepr' | 'memRef') => void
+  openPlaceholderTool: (name: string) => void
   closeTool: () => void
+
+  // Phase 3 SA-15 — Screen Magnifier toggle. Pure UI overlay, no
+  // engine state. Persisted? No — session-only.
+  screenMagnifierOn: boolean
+  toggleScreenMagnifier: () => void
+
+  // Phase 3 SA-16 — mobile layout state. Active tab in MobileShell
+  // and whether the off-canvas drawer is open. mobileEditAllowed
+  // toggles Monaco's readOnly off when the user explicitly opts
+  // into editing on a small screen (default: read-only).
+  mobileTab: 'editor' | 'registers' | 'memory' | 'console'
+  mobileDrawerOpen: boolean
+  mobileEditAllowed: boolean
+  setMobileTab: (tab: 'editor' | 'registers' | 'memory' | 'console') => void
+  toggleMobileDrawer: () => void
+  toggleMobileEdit: () => void
+
+  // Phase 3 SA-12 — read N words from the simulator's memory at the
+  // given (word-aligned) address. Returns an empty array when no
+  // simulator exists yet. Used by the Bitmap Display tool which
+  // re-paints from this on every step.
+  dumpMemory: (base: number, words: number) => ReadonlyArray<{ addr: number; word: number }>
+
+  // Phase 3 SA-15 — memory reference counter for the Mem Ref Viz
+  // tool. Bumped from the engine's read/write hooks when the tool
+  // is mounted. Cleared via clearMemoryRefs.
+  memoryRefCounts: Map<number, number>
+  recordMemoryRef: (addr: number) => void
+  clearMemoryRefs: () => void
+
+  // Phase 3 SA-13 — MMIO bridges to the engine. The Keyboard/Display
+  // tool calls pushKeystroke when the user types; the engine's
+  // receiver registers go ready until the program reads them.
+  // setMmioTransmitter installs a host-side handler that fires
+  // whenever the program stores to MMIO_TRANSMITTER_DATA.
+  pushKeystroke: (char: number) => void
+  setMmioTransmitter: (handler: ((char: number) => void) | null) => void
 
   // ─ FPU snapshot slice (Phase 2B; not persisted) ─
   // Mirrors Simulator.getFpuState(). The 32-element values array
@@ -732,7 +830,21 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     if (_sim) return _sim
     _sim = new Simulator({
       print: (s) => {
-        set((state) => ({ consoleOutput: [...state.consoleOutput, s] }))
+        // Defer the state update through queueMicrotask so React commits
+        // the previous render before the next state lands. Without this,
+        // the FIRST print of a program can land in the same microtask
+        // as the simulator's status flip to 'running', and the bottom
+        // panel never paints the freshly-mounted ConsolePanel before
+        // the second update arrives, dropping the first character.
+        queueMicrotask(() => {
+          set((state) => {
+            const nextBuffer = state.consoleBuffer + s
+            return {
+              consoleBuffer: nextBuffer,
+              consoleOutput: nextBuffer.split('\n'),
+            }
+          })
+        })
       },
       // syscall 5 — readInt. Suspends the simulator behind a Promise
       // that the UI's submitInput action resolves with a parsed int.
@@ -870,6 +982,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     status: 'idle',
     registers: initialRegisters,
     consoleOutput: [],
+    consoleBuffer: '',
     assemblerErrors: [],
     runtimeError: null,
     inspectorTab: 'registers',
@@ -939,7 +1052,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
 
     clearMessages: () => set({ messages: [] }),
 
-    clearConsole: () => set({ consoleOutput: [] }),
+    clearConsole: () => set({ consoleOutput: [], consoleBuffer: '' }),
 
     setConsoleFilter: (next) => set({ consoleFilter: next }),
 
@@ -1078,17 +1191,20 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       memHolder.halted = snap.halted
       memHolder.stepCount = snap.stepCount
       memHolder.lastChanged = new Set()
-      // Trim console output back to its pre-step length. Side effects
-      // like syscall exits aren't fully reversible — `halted` and
-      // `pc` cover the simulator-visible part; the toolbar's status
-      // pill flips back to 'paused' so the user sees they can step
-      // forward again.
+      // Trim the console buffer back to its pre-step character count
+      // and re-derive consoleOutput. SA-1's switch from per-print
+      // array-push to a single accumulating string means the snapshot
+      // now records buffer length in characters, not array elements.
       const engineState = sim.getState()
-      set((curr) => ({
-        status: 'paused',
-        registers: buildSnapshot(engineState, curr.registers),
-        consoleOutput: curr.consoleOutput.slice(0, snap.consoleLen),
-      }))
+      set((curr) => {
+        const trimmedBuffer = curr.consoleBuffer.slice(0, snap.consoleLen)
+        return {
+          status: 'paused',
+          registers: buildSnapshot(engineState, curr.registers),
+          consoleBuffer: trimmedBuffer,
+          consoleOutput: trimmedBuffer.split('\n'),
+        }
+      })
       get().refreshMemorySnapshot()
     },
 
@@ -1134,10 +1250,62 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
     openCommandPalette:  () => set({ commandPaletteOpen: true  }),
     closeCommandPalette: () => set({ commandPaletteOpen: false }),
 
+    layoutSizes: readPersistedLayoutSizes(),
+    setLayoutSize: (key, value) => {
+      const next = { ...get().layoutSizes, [key]: value }
+      set({ layoutSizes: next })
+      writePersistedLayoutSizes(next)
+    },
+
+    helpDialogOpen: false,
+    helpDialogTab:  'basic',
+    openHelp:  (tab) => set({ helpDialogOpen: true, ...(tab ? { helpDialogTab: tab } : {}) }),
+    closeHelp: ()    => set({ helpDialogOpen: false }),
+    setHelpTab: (tab) => set({ helpDialogTab: tab }),
+
     instructionsExecuted: 0,
     toolsDialog: null,
-    openTool:  (which) => set({ toolsDialog: which }),
-    closeTool: ()      => set({ toolsDialog: null  }),
+    toolsPlaceholderName: '',
+    openTool: (which) => set({ toolsDialog: which }),
+    openPlaceholderTool: (name) => set({ toolsDialog: 'placeholder', toolsPlaceholderName: name }),
+    closeTool: () => set({ toolsDialog: null }),
+
+    screenMagnifierOn: false,
+    toggleScreenMagnifier: () => set((s) => ({ screenMagnifierOn: !s.screenMagnifierOn })),
+
+    mobileTab: 'editor',
+    mobileDrawerOpen: false,
+    mobileEditAllowed: false,
+    setMobileTab: (tab) => set({ mobileTab: tab, mobileDrawerOpen: false }),
+    toggleMobileDrawer: () => set((s) => ({ mobileDrawerOpen: !s.mobileDrawerOpen })),
+    toggleMobileEdit: () => set((s) => ({ mobileEditAllowed: !s.mobileEditAllowed })),
+
+    dumpMemory: (base, words) => {
+      if (!_sim) return []
+      try {
+        return _sim.memoryDump(base >>> 0, words)
+      } catch {
+        return []
+      }
+    },
+
+    memoryRefCounts: new Map<number, number>(),
+    recordMemoryRef: (addr) => {
+      // Aggregate at word granularity so the visualization stays
+      // useful even when programs touch byte/half addresses.
+      const aligned = (addr & ~0x3) >>> 0
+      const next = new Map(get().memoryRefCounts)
+      next.set(aligned, (next.get(aligned) ?? 0) + 1)
+      set({ memoryRefCounts: next })
+    },
+    clearMemoryRefs: () => set({ memoryRefCounts: new Map<number, number>() }),
+
+    pushKeystroke: (char) => {
+      if (_sim) _sim.pushMmioKey(char)
+    },
+    setMmioTransmitter: (handler) => {
+      if (_sim) _sim.setMmioTransmitterHandler(handler)
+    },
 
     fpRegisters: {
       values: new Array<number>(32).fill(0),
@@ -1426,6 +1594,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
         program,
         registers: buildSnapshot(engineState, initialRegisters),
         consoleOutput: [],
+        consoleBuffer: '',
         assemblerErrors: [],
         runtimeError: null,
         instructionsExecuted: 0,
@@ -1446,8 +1615,11 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       patchMemoryForBackstep(sim)
       void (async () => {
         try {
-          set({ status: 'running' })
-          pushHistorySnapshot(sim, get().consoleOutput.length)
+          // SA-1: pre-warm a console-buffer set BEFORE the first
+          // sim.step so React commits a paint of the (always-mounted)
+          // ConsolePanel before the first print's microtask lands.
+          set({ status: 'running', consoleBuffer: get().consoleBuffer })
+          pushHistorySnapshot(sim, get().consoleBuffer.length)
           await sim.step()
           _currentMemWrites = null
           const engineState = sim.getState()
@@ -1480,7 +1652,10 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
       const sim = makeSim()
       patchMemoryForBackstep(sim)
       _stopFlag = false
-      set({ status: 'running' })
+      // SA-1: pre-warm console-buffer set BEFORE the first sim.step
+      // so React commits a paint of the always-mounted ConsolePanel
+      // before the first print's microtask lands.
+      set({ status: 'running', consoleBuffer: get().consoleBuffer })
       void (async () => {
         try {
           let hitBreakpoint = false
@@ -1515,7 +1690,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
               await new Promise<void>((r) => setTimeout(r, 1000 / runSpeed))
             }
             const prevRegisters = get().registers
-            pushHistorySnapshot(sim, get().consoleOutput.length)
+            pushHistorySnapshot(sim, get().consoleBuffer.length)
             await sim.step()
             _currentMemWrites = null
             if (runSpeed === 0 && i % 500 === 0) {
@@ -1574,6 +1749,7 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
           ? buildSnapshot(engineState, initialRegisters)
           : initialRegisters,
         consoleOutput: [],
+        consoleBuffer: '',
         assemblerErrors: [],
         runtimeError: null,
         // Discarding any pending input — the program isn't waiting
