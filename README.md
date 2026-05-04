@@ -8,7 +8,7 @@ The project is built in TypeScript with React, Vite, and Tailwind CSS, and runs 
 
 ## Status
 
-v1.0 ready. Every PRD must-have and stretch goal shipped; 103 tests passing; full MARS feature parity for the curriculum we target.
+v1.1.0. Every PRD must-have and stretch goal shipped, plus the Phase 3 bug-fix sweep: missing pseudo-instructions, console first-byte fix, resizable panels, in-app help dialog, breakpoint hover preview, full Tools menu (Bitmap Display, MMIO simulator, IEEE 754 representation, memory reference visualization, screen magnifier), reworked mobile shell with tabbed layout. 119 tests passing.
 
 See [the PRD](./docs/PRD.md) for the full scope, timeline, and roadmap, [the final report](./docs/FINAL_REPORT.md) for the project writeup, or [the demo script](./docs/DEMO_SCRIPT.md) for a seven-minute walkthrough.
 
