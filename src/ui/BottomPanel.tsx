@@ -97,11 +97,22 @@ export function BottomPanel() {
         </button>
       </div>
 
+      {/* All three panels mount as soon as the bottom panel is open
+         so the console can absorb the first print of a program even
+         when the user has Messages or Problems active. The hidden
+         attribute keeps inactive panels off-screen and out of the
+         tab order without unmounting their state. */}
       {open && (
         <div className="min-h-0 flex-1 overflow-hidden">
-          {activeTab === 'console'  && <ConsolePanel />}
-          {activeTab === 'messages' && <MessagesPanel />}
-          {activeTab === 'problems' && <ProblemsPanel />}
+          <div hidden={activeTab !== 'console'}  aria-hidden={activeTab !== 'console'}  className={cn('h-full', activeTab !== 'console'  && 'hidden')}>
+            <ConsolePanel />
+          </div>
+          <div hidden={activeTab !== 'messages'} aria-hidden={activeTab !== 'messages'} className={cn('h-full', activeTab !== 'messages' && 'hidden')}>
+            <MessagesPanel />
+          </div>
+          <div hidden={activeTab !== 'problems'} aria-hidden={activeTab !== 'problems'} className={cn('h-full', activeTab !== 'problems' && 'hidden')}>
+            <ProblemsPanel />
+          </div>
         </div>
       )}
     </footer>
