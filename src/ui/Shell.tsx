@@ -14,6 +14,7 @@ import { SettingsDialog } from './SettingsDialog.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
 import { InstructionCounter } from './InstructionCounter.tsx'
 import { HelpDialog } from './HelpDialog.tsx'
+import { MobileShell } from './MobileShell.tsx'
 import { BitmapDisplay } from './tools/BitmapDisplay.tsx'
 import { KeyboardDisplayMmio } from './tools/KeyboardDisplayMmio.tsx'
 import { FpRepresentation } from './tools/FpRepresentation.tsx'
@@ -88,35 +89,14 @@ export function Shell() {
   // workspace grid below). The previous static class-based templates
   // were removed once the dynamic style props landed.
 
-  // On mobile (<768px) the shell collapses to a read-only editor +
-  // status bar. The toolbar / tab strip / panels all consume too much
-  // vertical space at phone widths to be useful, and Monaco runs in
-  // readOnly mode so write affordances would just be confusing.
+  // Phase 3 SA-16: under 768px viewport, the desktop shell is
+  // unusable. MobileShell provides a fundamentally different layout:
+  // header with hamburger drawer, tab strip (Editor / Registers /
+  // Memory / Console), tab body, and a control bar at the bottom.
   if (isMobile) {
     return (
       <>
-        <div className="grid h-dvh grid-rows-[32px_36px_1fr_24px] overflow-hidden bg-surface-0 text-ink-1">
-          <header
-            className="flex items-center gap-2 border-b border-divider bg-surface-1 px-3 font-display text-xs text-ink-1"
-            style={{ letterSpacing: '0.04em' }}
-            role="banner"
-          >
-            <span aria-hidden="true" className="size-2 bg-accent" />
-            WebMARS
-            <span className="ml-2 truncate text-[10px] uppercase text-ink-3" style={{ letterSpacing: '0.06em' }}>
-              read-only mode
-            </span>
-          </header>
-          <div
-            role="status"
-            className="flex items-center gap-2 border-b border-divider bg-surface-2 px-3 text-[11px] text-ink-2"
-          >
-            <span aria-hidden="true" className="text-warn">⚠</span>
-            <span>Open in a desktop browser to edit, assemble, and run programs.</span>
-          </div>
-          <SourcePane />
-          <StatusBar />
-        </div>
+        <MobileShell />
         {import.meta.env.DEV && <DevPanel />}
       </>
     )

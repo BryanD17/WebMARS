@@ -695,6 +695,17 @@ interface SimulatorStoreState {
   screenMagnifierOn: boolean
   toggleScreenMagnifier: () => void
 
+  // Phase 3 SA-16 — mobile layout state. Active tab in MobileShell
+  // and whether the off-canvas drawer is open. mobileEditAllowed
+  // toggles Monaco's readOnly off when the user explicitly opts
+  // into editing on a small screen (default: read-only).
+  mobileTab: 'editor' | 'registers' | 'memory' | 'console'
+  mobileDrawerOpen: boolean
+  mobileEditAllowed: boolean
+  setMobileTab: (tab: 'editor' | 'registers' | 'memory' | 'console') => void
+  toggleMobileDrawer: () => void
+  toggleMobileEdit: () => void
+
   // Phase 3 SA-12 — read N words from the simulator's memory at the
   // given (word-aligned) address. Returns an empty array when no
   // simulator exists yet. Used by the Bitmap Display tool which
@@ -1261,6 +1272,13 @@ export const useSimulator = create<SimulatorStoreState>((set, get) => {
 
     screenMagnifierOn: false,
     toggleScreenMagnifier: () => set((s) => ({ screenMagnifierOn: !s.screenMagnifierOn })),
+
+    mobileTab: 'editor',
+    mobileDrawerOpen: false,
+    mobileEditAllowed: false,
+    setMobileTab: (tab) => set({ mobileTab: tab, mobileDrawerOpen: false }),
+    toggleMobileDrawer: () => set((s) => ({ mobileDrawerOpen: !s.mobileDrawerOpen })),
+    toggleMobileEdit: () => set((s) => ({ mobileEditAllowed: !s.mobileEditAllowed })),
 
     dumpMemory: (base, words) => {
       if (!_sim) return []

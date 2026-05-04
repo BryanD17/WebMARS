@@ -27,6 +27,7 @@ export function CodeEditor() {
   const assemblerErrors  = useSimulator((s) => s.assemblerErrors)
   const breakpoints      = useSimulator((s) => s.breakpoints)
   const editorFontSize   = useSimulator((s) => s.editorFontSize)
+  const mobileEditAllowed= useSimulator((s) => s.mobileEditAllowed)
   const isMobile         = useIsMobile()
 
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
@@ -196,13 +197,16 @@ export function CodeEditor() {
         // ~1.5x which keeps the gutter glyph centered as the user
         // resizes via the settings dialog.
         lineHeight: 0,
-        readOnly: isMobile,
+        // Phase 3 SA-16: mobile is read-only by default but the user
+        // can opt into editing via the header toggle. Word wrap and
+        // minimap also adapt to phone widths.
+        readOnly: isMobile && !mobileEditAllowed,
+        wordWrap: isMobile ? 'on' : 'off',
+        minimap: { enabled: !isMobile, side: 'right', renderCharacters: false },
         lineNumbers: 'on',
         rulers: [80],
-        minimap: { enabled: true, side: 'right', renderCharacters: false },
         tabSize: 4,
         insertSpaces: true,
-        wordWrap: 'off',
         glyphMargin: true,           // SA-9 attaches breakpoint glyphs here
         folding: true,
         automaticLayout: true,       // resizes when right/bottom panel toggles
