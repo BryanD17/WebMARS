@@ -270,7 +270,7 @@ export function MenuBar() {
               <div
                 role="menu"
                 aria-label={menu.label}
-                className="absolute left-0 top-full z-40 mt-1 min-w-[14rem] rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
+                className="absolute left-0 top-full z-40 mt-1 min-w-[14rem] max-h-[60vh] overflow-y-auto rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
               >
                 {menu.items.map((item, j) => {
                   if (item.kind === 'separator') {

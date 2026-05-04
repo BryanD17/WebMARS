@@ -103,7 +103,7 @@ function ExamplesDropdown() {
         <div
           role="menu"
           aria-label="Load example program"
-          className="absolute left-0 top-full z-40 mt-1 min-w-[18rem] rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
+          className="absolute left-0 top-full z-40 mt-1 min-w-[18rem] max-h-[60vh] overflow-y-auto rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
         >
           {EXAMPLES.map((example) => (
             <button
