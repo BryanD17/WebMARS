@@ -8,45 +8,44 @@ const MAX_VISIBLE_LINES = 1000
 const AUTO_SCROLL_THRESHOLD = 16  // px from bottom — within this counts as "at bottom"
 
 export function ConsolePanel() {
-  const lines        = useSimulator((s) => s.consoleOutput)
+  // Phase 3 follow-up: render the full consoleBuffer in a single
+  // <pre> element. The previous "one <pre> per array element"
+  // approach interacted badly with React's reconciliation when the
+  // buffer was split on newlines, dropping the first character of
+  // every line in the visible output. A single <pre> with whitespace
+  // preserved sidesteps the issue entirely (browsers render \n in
+  // pre as line breaks natively).
+  const buffer       = useSimulator((s) => s.consoleBuffer)
   const filter       = useSimulator((s) => s.consoleFilter)
   const setFilter    = useSimulator((s) => s.setConsoleFilter)
   const clearConsole = useSimulator((s) => s.clearConsole)
   const pending      = useSimulator((s) => s.pendingInput)
-  // Pending object reference doubles as the React key — every new
-  // read syscall installs a new pending object, which re-mounts the
-  // input field (resetting its value and re-focusing).
   const pendingKey   = useSimulator((s) => s.pendingInput?.kind ?? 'idle')
 
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  // atBottom drives both effects (auto-scroll on new output) and
-  // render (the "↓ latest" affordance), so it lives in state.
   const [atBottom, setAtBottom] = useState(true)
 
-  // Filter (case-insensitive substring) + windowing — render only the
-  // last MAX_VISIBLE_LINES so very long programs don't blow up the
-  // DOM. The (N earlier hidden) hint surfaces the omission.
-  const { displayLines, hiddenCount } = useMemo(() => {
+  // Filter (case-insensitive substring) + windowing on a per-line
+  // basis. The visible string joins surviving lines back with \n so
+  // the single <pre> renders them as actual line breaks.
+  const { visibleText, hiddenCount } = useMemo(() => {
+    const allLines = buffer.split('\n')
     const filtered = filter
-      ? lines.filter((line) => line.toLowerCase().includes(filter.toLowerCase()))
-      : lines
+      ? allLines.filter((line) => line.toLowerCase().includes(filter.toLowerCase()))
+      : allLines
     if (filtered.length <= MAX_VISIBLE_LINES) {
-      return { displayLines: filtered, hiddenCount: 0 }
+      return { visibleText: filtered.join('\n'), hiddenCount: 0 }
     }
-    return {
-      displayLines: filtered.slice(-MAX_VISIBLE_LINES),
-      hiddenCount: filtered.length - MAX_VISIBLE_LINES,
-    }
-  }, [lines, filter])
+    const tail = filtered.slice(-MAX_VISIBLE_LINES)
+    return { visibleText: tail.join('\n'), hiddenCount: filtered.length - MAX_VISIBLE_LINES }
+  }, [buffer, filter])
 
-  // Auto-scroll to bottom on new output, but only if the user hasn't
-  // scrolled up.
   useEffect(() => {
     if (!atBottom) return
     const el = scrollRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [displayLines, atBottom])
+  }, [visibleText, atBottom])
 
   function handleScroll(): void {
     const el = scrollRef.current
@@ -58,7 +57,7 @@ export function ConsolePanel() {
 
   function handleCopy(): void {
     if (typeof navigator === 'undefined' || !navigator.clipboard) return
-    void navigator.clipboard.writeText(lines.join(''))
+    void navigator.clipboard.writeText(buffer)
   }
 
   function scrollToBottom(): void {
@@ -68,7 +67,7 @@ export function ConsolePanel() {
     el.scrollTop = el.scrollHeight
   }
 
-  const hasContent = displayLines.length > 0 || hiddenCount > 0
+  const hasContent = visibleText.length > 0 || hiddenCount > 0
   const showJumpToBottom = !atBottom && hasContent
 
   return (
@@ -81,11 +80,11 @@ export function ConsolePanel() {
         <button
           type="button"
           onClick={clearConsole}
-          disabled={lines.length === 0}
+          disabled={buffer.length === 0}
           className={cn(
             'rounded-sm px-2 py-0.5 transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
-            lines.length === 0
+            buffer.length === 0
               ? 'cursor-not-allowed text-ink-3'
               : 'text-ink-2 hover:bg-surface-2 hover:text-ink-1',
           )}
@@ -95,12 +94,12 @@ export function ConsolePanel() {
         <button
           type="button"
           onClick={handleCopy}
-          disabled={lines.length === 0}
+          disabled={buffer.length === 0}
           title="Copy console output to clipboard"
           className={cn(
             'rounded-sm px-2 py-0.5 transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
-            lines.length === 0
+            buffer.length === 0
               ? 'cursor-not-allowed text-ink-3'
               : 'text-ink-2 hover:bg-surface-2 hover:text-ink-1',
           )}
@@ -150,15 +149,11 @@ export function ConsolePanel() {
                 ({hiddenCount} earlier line{hiddenCount === 1 ? '' : 's'} hidden — clear or filter to narrow)
               </div>
             )}
-            {displayLines.map((line, i) => (
-              <pre
-                // Console output is append-only; index-as-key is safe.
-                key={`line-${i}`}
-                className="m-0 whitespace-pre-wrap break-words font-mono text-xs leading-5 text-ink-1"
-              >
-                {line}
-              </pre>
-            ))}
+            {/* Single <pre> for the entire visible buffer. Browsers
+               render \n in pre as line breaks natively, so we don't
+               need per-line elements. The prior approach lost the
+               first character of every line on multi-line output. */}
+            <pre className="m-0 whitespace-pre-wrap break-words font-mono text-xs leading-5 text-ink-1">{visibleText}</pre>
           </div>
         )}
       </div>

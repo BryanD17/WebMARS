@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSimulator, type ExampleName, RUN_SPEED_STOPS } from '@/hooks/useSimulator.ts'
 import { getEditorCursor } from '@/lib/editorCursor.ts'
 import { Button } from './Button.tsx'
@@ -53,19 +54,23 @@ const EXAMPLES: ReadonlyArray<{ id: ExampleName; label: string; desc: string }> 
   { id: 'syscallIO',   label: 'Syscall I/O',       desc: 'read int, print int (full I/O)' },
   { id: 'floatMath',   label: 'Float Math (FPU)',  desc: 'sqrt(3² + 4²) via mtc1/cvt.s.w/mul.s' },
   { id: 'mmioEcho',    label: 'MMIO Keyboard Echo',desc: 'poll receiver, echo to transmitter' },
+  { id: 'bitmapSmile', label: 'Bitmap Smile',     desc: 'data only — open Tools → Bitmap Display' },
 ]
 
 function ExamplesDropdown() {
   const loadFromExample = useSimulator((s) => s.loadFromExample)
   const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node
       if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
+        buttonRef.current && !buttonRef.current.contains(target) &&
+        menuRef.current && !menuRef.current.contains(target)
       ) {
         setOpen(false)
       }
@@ -81,9 +86,20 @@ function ExamplesDropdown() {
     }
   }, [open])
 
+  // Phase 3 follow-up: portal the dropdown to document.body so it
+  // escapes the Shell's outer overflow:hidden. Re-measure the
+  // button's position whenever the menu opens so the portal lands
+  // directly under the trigger.
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) return
+    const rect = buttonRef.current.getBoundingClientRect()
+    setPos({ left: rect.left, top: rect.bottom + 4 })
+  }, [open])
+
   return (
-    <div ref={containerRef} className="relative">
+    <>
       <button
+        ref={buttonRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -100,11 +116,13 @@ function ExamplesDropdown() {
         <span aria-hidden="true" className="text-[10px] text-ink-3">▾</span>
       </button>
 
-      {open && (
+      {open && pos && createPortal(
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Load example program"
-          className="absolute left-0 top-full z-40 mt-1 min-w-[18rem] max-h-[60vh] overflow-y-auto rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
+          style={{ position: 'fixed', left: pos.left, top: pos.top }}
+          className="z-[60] min-w-[18rem] max-h-[60vh] overflow-y-auto rounded-md border border-divider bg-surface-elev py-1 shadow-lg"
         >
           {EXAMPLES.map((example) => (
             <button
@@ -123,9 +141,10 @@ function ExamplesDropdown() {
               </div>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   )
 }
 

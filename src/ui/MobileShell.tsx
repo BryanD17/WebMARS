@@ -206,12 +206,17 @@ export function MobileShell() {
           ))}
         </div>
 
-        {/* Body */}
-        <main className="overflow-hidden">
-          <div hidden={tab !== 'editor'}    className={cn('h-full', tab !== 'editor'    && 'hidden')}><SourcePane /></div>
-          <div hidden={tab !== 'registers'} className={cn('h-full overflow-y-auto px-3 py-2', tab !== 'registers' && 'hidden')}><RegisterTable /></div>
-          <div hidden={tab !== 'memory'}    className={cn('h-full overflow-y-auto px-3 py-2', tab !== 'memory'    && 'hidden')}><MemoryPanel /></div>
-          <div hidden={tab !== 'console'}   className={cn('h-full', tab !== 'console'   && 'hidden')}><ConsolePanel /></div>
+        {/* Body — Phase 3 follow-up: relative + min-h-0 + explicit
+           inset-0 child positioning so Monaco's automaticLayout can
+           measure the editor pane on mobile. The previous structure
+           collapsed to a sliver on portrait phones because the grid
+           row's intrinsic size depended on Monaco reporting back its
+           own height (chicken-and-egg). */}
+        <main className="relative min-h-0 overflow-hidden">
+          <div hidden={tab !== 'editor'}    className={cn('absolute inset-0', tab !== 'editor'    && 'hidden')}><SourcePane /></div>
+          <div hidden={tab !== 'registers'} className={cn('absolute inset-0 overflow-y-auto px-3 py-2', tab !== 'registers' && 'hidden')}><RegisterTable /></div>
+          <div hidden={tab !== 'memory'}    className={cn('absolute inset-0 overflow-y-auto px-3 py-2', tab !== 'memory'    && 'hidden')}><MemoryPanel /></div>
+          <div hidden={tab !== 'console'}   className={cn('absolute inset-0', tab !== 'console'   && 'hidden')}><ConsolePanel /></div>
         </main>
 
         {/* Control bar */}

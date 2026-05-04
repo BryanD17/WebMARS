@@ -114,9 +114,10 @@ export function HelpDialog() {
         aria-label="Help"
         tabIndex={-1}
         className={cn(
-          'flex h-[44rem] w-[60rem] flex-col overflow-hidden rounded-lg border border-divider bg-surface-1 shadow-xl',
+          'flex max-h-[90vh] w-[60rem] max-w-[95vw] flex-col overflow-hidden rounded-lg border border-divider bg-surface-1 shadow-xl',
           'focus-visible:outline-none',
         )}
+        style={{ height: '90vh' }}
       >
         <header className="flex h-10 flex-none items-center justify-between border-b border-divider px-4">
           <div className="flex items-center gap-2 text-sm text-ink-1">
