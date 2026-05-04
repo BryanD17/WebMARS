@@ -2,6 +2,8 @@ import { useSimulator, type LeftPanelKey } from '@/hooks/useSimulator.ts'
 import { BreakpointsPanel } from './BreakpointsPanel.tsx'
 import { SymbolsPanel } from './SymbolsPanel.tsx'
 import { ReferencePanel } from './ReferencePanel.tsx'
+import { ProjectPanel } from './ProjectPanel.tsx'
+import { ToolsPanel } from './ToolsPanel.tsx'
 import { cn } from './cn.ts'
 
 interface RailIcon {
@@ -12,11 +14,11 @@ interface RailIcon {
 }
 
 const RAIL_ICONS: ReadonlyArray<RailIcon> = [
-  { id: 'project',     label: 'Project',          glyph: '◧', futureSubAgent: 'SA-2 (file system)' },
+  { id: 'project',     label: 'Project',          glyph: '◧' },
   { id: 'symbols',     label: 'Symbols',          glyph: '⌗' },
   { id: 'breakpoints', label: 'Breakpoints',      glyph: '●' },
   { id: 'reference',   label: 'Reference',        glyph: '?' },
-  { id: 'tools',       label: 'Tools',            glyph: '⚙', futureSubAgent: 'SA-15' },
+  { id: 'tools',       label: 'Tools',            glyph: '⚙' },
 ]
 
 // Reads leftRailExpanded + leftPanelKey from the layout slice.
@@ -117,6 +119,10 @@ export function LeftRail() {
             <SymbolsPanel />
           ) : panelKey === 'reference' ? (
             <ReferencePanel />
+          ) : panelKey === 'project' ? (
+            <ProjectPanel />
+          ) : panelKey === 'tools' ? (
+            <ToolsPanel />
           ) : (
             <div className="px-3 py-3 text-xs italic text-ink-3">
               ({panelKey} panel lands in a later sub-agent)

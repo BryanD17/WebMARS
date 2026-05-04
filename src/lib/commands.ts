@@ -25,6 +25,8 @@ const EXAMPLES: ReadonlyArray<{ id: ExampleName; label: string }> = [
   { id: 'sumToN',      label: 'Sum 1..N'     },
   { id: 'syscallIO',   label: 'Syscall I/O'  },
   { id: 'floatMath',   label: 'Float Math (FPU)' },
+  { id: 'mmioEcho',    label: 'MMIO Keyboard Echo' },
+  { id: 'bitmapSmile', label: 'Bitmap Smile' },
 ]
 
 export function buildCommands(): Command[] {
