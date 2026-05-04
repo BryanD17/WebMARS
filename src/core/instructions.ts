@@ -25,6 +25,32 @@ function tokenizeLine(line: string, lineNum: number): Token[] {
       s = s.slice(end + 1);
       continue;
     }
+    // Phase 3 follow-up: single-quoted char literals are immediates
+    // whose value is the character's codepoint. Without this, .byte
+    // 'j' was tokenized as an ident, pass 1 counted 1 byte (default
+    // when no immediate followed) but pass 2 emitted nothing —
+    // every label after a .byte 'X' fell out of sync with the
+    // emitted memory layout. Supports the standard escape set.
+    if (s.startsWith("'")) {
+      const end = s.indexOf("'", 1);
+      if (end !== -1) {
+        const inner = s.slice(1, end);
+        let charCode: number | null = null;
+        if (inner.length === 1)        charCode = inner.charCodeAt(0);
+        else if (inner === '\\n')      charCode = 0x0a;
+        else if (inner === '\\t')      charCode = 0x09;
+        else if (inner === '\\0')      charCode = 0;
+        else if (inner === '\\r')      charCode = 0x0d;
+        else if (inner === '\\\\')     charCode = 0x5c;
+        else if (inner === "\\'")      charCode = 0x27;
+        else if (inner === '\\"')      charCode = 0x22;
+        if (charCode !== null) {
+          tokens.push({ type: 'immediate', value: String(charCode), line: lineNum });
+          s = s.slice(end + 1);
+          continue;
+        }
+      }
+    }
     if (s[0] === ',') { tokens.push({ type: 'comma', value: ',', line: lineNum }); s = s.slice(1); continue; }
     if (s[0] === '(') { tokens.push({ type: 'lparen', value: '(', line: lineNum }); s = s.slice(1); continue; }
     if (s[0] === ')') { tokens.push({ type: 'rparen', value: ')', line: lineNum }); s = s.slice(1); continue; }
@@ -103,6 +129,31 @@ export function assemble(source: string): AssembledProgram {
     const toks = tokenizeLine(lines[i] ?? '', i + 1);
     allTokens.push(toks);
 
+    // Phase 3 follow-up: auto-align dataAddr BEFORE any label on this
+    // line gets committed. Real MARS auto-aligns .word and .half
+    // (and the explicit .align N) so labels following a .byte or
+    // .asciiz still land on natural boundaries. The pre-scan looks
+    // at the directives on this line and bumps dataAddr UP first.
+    // Only effective when we were already in .data at line start;
+    // a .data switch inside this line is handled normally below.
+    if (!inText) {
+      for (const t of toks) {
+        if (t.type !== 'directive') continue;
+        if (t.value === '.word' || t.value === '.float') {
+          dataAddr = (dataAddr + 3) & ~3
+          break
+        }
+        if (t.value === '.double') {
+          dataAddr = (dataAddr + 7) & ~7
+          break
+        }
+        if (t.value === '.half') {
+          dataAddr = (dataAddr + 1) & ~1
+          break
+        }
+      }
+    }
+
     let mnemonicSeen = false;
 
     for (let j = 0; j < toks.length; j++) {
@@ -151,6 +202,19 @@ export function assemble(source: string): AssembledProgram {
           } else if (tok.value === '.space') {
             const sz = toks[j + 1];
             if (sz) dataAddr += parseImm(sz.value);
+          } else if (tok.value === '.align') {
+            // .align N → align dataAddr UP to next 2^N boundary.
+            // No-op when already aligned. N=0 explicitly disables
+            // alignment for the next directive in real MARS, but
+            // we do not implement that nuance.
+            const sz = toks[j + 1];
+            if (sz?.type === 'immediate') {
+              const n = parseImm(sz.value);
+              const boundary = 1 << n;
+              if (boundary > 1) {
+                dataAddr = (dataAddr + boundary - 1) & ~(boundary - 1);
+              }
+            }
           }
         }
       } else if (tok.type === 'ident' && !mnemonicSeen && inText) {
@@ -190,6 +254,28 @@ export function assemble(source: string): AssembledProgram {
   for (let i = 0; i < lines.length; i++) {
     const toks = allTokens[i]!;
     let j = 0;
+
+    // Phase 3 follow-up: mirror pass 1's auto-alignment by emitting
+    // pad bytes BEFORE any .word/.half/.float/.double directive on
+    // this line. Keeps dataBytes.length in sync with the addresses
+    // pass 1 baked into the labels map.
+    if (!inText) {
+      for (const t of toks) {
+        if (t.type !== 'directive') continue;
+        if (t.value === '.word' || t.value === '.float') {
+          while (dataBytes.length & 3) dataBytes.push(0);
+          break;
+        }
+        if (t.value === '.double') {
+          while (dataBytes.length & 7) dataBytes.push(0);
+          break;
+        }
+        if (t.value === '.half') {
+          while (dataBytes.length & 1) dataBytes.push(0);
+          break;
+        }
+      }
+    }
 
     while (j < toks.length) {
       const tok = toks[j]!;
@@ -263,6 +349,18 @@ export function assemble(source: string): AssembledProgram {
             if (sz) {
               const n = parseImm(sz.value);
               for (let k = 0; k < n; k++) dataBytes.push(0);
+            }
+            j += 2; continue;
+          }
+          if (dir === '.align') {
+            // .align N → pad dataBytes UP to next 2^N boundary.
+            const sz = toks[j + 1];
+            if (sz?.type === 'immediate') {
+              const n = parseImm(sz.value);
+              const boundary = 1 << n;
+              if (boundary > 1) {
+                while (dataBytes.length % boundary !== 0) dataBytes.push(0);
+              }
             }
             j += 2; continue;
           }
