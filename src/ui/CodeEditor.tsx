@@ -178,7 +178,11 @@ export function CodeEditor() {
 
   return (
     <Editor
+      // 100% works on flex/grid parents that report a real pixel
+      // height. On mobile, MobileShell now uses flexbox so the
+      // parent's height is concrete on the first frame.
       height="100%"
+      width="100%"
       language="mips"
       theme="webmars-dark"
       value={source}
