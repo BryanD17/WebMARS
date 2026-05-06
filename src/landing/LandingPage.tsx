@@ -1,28 +1,21 @@
 import './tokens.css'
-import { navigate } from '@/lib/router'
+import { Nav } from './Nav.tsx'
+import { Hero } from './Hero.tsx'
 
-// Phase 4 SA-1 placeholder. SA-2 expands this into a multi-section
-// page; for now it confirms the routing wiring works end-to-end.
+// Phase 4 SA-2: top-level landing page. Each section lives in its
+// own file; this component just assembles them in order. Sections
+// are filled in incrementally per SA-3..SA-10.
 
 export default function LandingPage() {
   return (
-    <div className="landing min-h-dvh">
-      <main className="mx-auto flex min-h-dvh max-w-3xl flex-col items-center justify-center gap-6 px-6 py-16 text-center">
-        <h1 className="text-5xl font-bold" style={{ color: 'var(--l-ink-1)' }}>
-          WebMARS
-        </h1>
-        <p className="text-lg" style={{ color: 'var(--l-ink-2)' }}>
-          Modern, browser-based MIPS simulator. Real landing page lands in SA-2.
-        </p>
-        <button
-          type="button"
-          onClick={() => navigate('/app')}
-          className="rounded-lg px-6 py-3 text-base font-semibold text-white"
-          style={{ background: 'var(--l-accent)' }}
-        >
-          Open the editor →
-        </button>
+    <div className="landing">
+      <Nav />
+      <main>
+        <Hero />
+        {/* SA-4 ProofBar, SA-5 Features, SA-6 Showcase, SA-7
+           Personas, SA-8 OriginStory, SA-9 FinalCTA arrive here. */}
       </main>
+      {/* SA-10 Footer. */}
     </div>
   )
 }
