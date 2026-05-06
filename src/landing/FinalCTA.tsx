@@ -23,7 +23,7 @@ export function FinalCTA() {
   return (
     <section
       aria-labelledby="cta-heading"
-      className="py-32"
+      className="landing-reveal py-32"
       style={{ background: 'linear-gradient(135deg, var(--l-accent) 0%, var(--l-accent-dark) 100%)' }}
     >
       <div className="mx-auto max-w-4xl px-6 text-center">

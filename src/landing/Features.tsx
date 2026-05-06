@@ -87,7 +87,7 @@ const FEATURES: ReadonlyArray<Feature> = [
 
 export function Features() {
   return (
-    <section id="features" aria-labelledby="features-heading" className="py-24 md:py-32">
+    <section id="features" aria-labelledby="features-heading" className="landing-reveal py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-6">
         {/* Header */}
         <div className="max-w-3xl">

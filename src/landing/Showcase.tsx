@@ -89,7 +89,7 @@ const ROWS: ReadonlyArray<Row> = [
 
 export function Showcase() {
   return (
-    <section id="showcase" aria-labelledby="showcase-heading" className="py-24 md:py-32" style={{ background: 'var(--l-bg-alt)' }}>
+    <section id="showcase" aria-labelledby="showcase-heading" className="landing-reveal py-24 md:py-32" style={{ background: 'var(--l-bg-alt)' }}>
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-3xl">
           <span className="mono text-[13px] font-medium uppercase" style={{ color: 'var(--l-accent)', letterSpacing: '0.1em' }}>

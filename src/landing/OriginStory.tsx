@@ -43,7 +43,7 @@ export function OriginStory() {
     <section
       id="team"
       aria-labelledby="team-heading"
-      className="py-24 md:py-32"
+      className="landing-reveal py-24 md:py-32"
       style={{ background: 'var(--l-bg-dark)' }}
     >
       <div className="mx-auto max-w-7xl px-6">

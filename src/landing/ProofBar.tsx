@@ -12,7 +12,7 @@ export function ProofBar() {
   return (
     <section
       aria-label="Project stats"
-      className="py-12"
+      className="landing-reveal py-12"
       style={{ background: 'var(--l-bg-alt)' }}
     >
       <div className="mx-auto flex max-w-7xl flex-col items-stretch gap-8 px-6 sm:flex-row sm:items-center sm:justify-around sm:divide-x" style={{ borderColor: 'var(--l-border)' }}>

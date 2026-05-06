@@ -70,7 +70,7 @@ const PERSONAS: ReadonlyArray<Persona> = [
 
 export function Personas() {
   return (
-    <section id="personas" aria-labelledby="personas-heading" className="py-24 md:py-32">
+    <section id="personas" aria-labelledby="personas-heading" className="landing-reveal py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-3xl">
           <span className="mono text-[13px] font-medium uppercase" style={{ color: 'var(--l-accent)', letterSpacing: '0.1em' }}>

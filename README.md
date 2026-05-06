@@ -6,6 +6,10 @@ WebMARS is a functional re-implementation of the core features of the original [
 
 The project is built in TypeScript with React, Vite, and Tailwind CSS, and runs entirely in the browser.
 
+## Live demo
+
+Visit **[webmarsimulator.com](https://www.webmarsimulator.com/)** for the project landing page, or jump straight to the IDE at **[webmarsimulator.com/app](https://www.webmarsimulator.com/app)**.
+
 ## Status
 
 v1.1.0. Every PRD must-have and stretch goal shipped, plus the Phase 3 bug-fix sweep: missing pseudo-instructions, console first-byte fix, resizable panels, in-app help dialog, breakpoint hover preview, full Tools menu (Bitmap Display, MMIO simulator, IEEE 754 representation, memory reference visualization, screen magnifier), reworked mobile shell with tabbed layout. 119 tests passing.

@@ -97,7 +97,7 @@ export function Hero() {
            dimensions so layout doesn't shift. */}
         <div className="relative">
           <div
-            className="relative mx-auto overflow-hidden"
+            className="hero-visual-float relative mx-auto overflow-hidden"
             style={{
               width: '100%',
               maxWidth: 600,
@@ -105,8 +105,9 @@ export function Hero() {
               borderRadius: 16,
               boxShadow: 'var(--l-shadow-xl)',
               background: 'var(--l-bg-dark)',
-              transform: 'perspective(1200px) rotateY(-5deg) rotateX(2deg)',
             }}
+            role="img"
+            aria-label="WebMARS editor with a Hello-MIPS program loaded, register table on the right showing live values"
           >
             {/* Mock IDE chrome so the placeholder looks intentional */}
             <div className="flex items-center gap-2 px-4 py-3" style={{ background: '#1a1d24' }}>
