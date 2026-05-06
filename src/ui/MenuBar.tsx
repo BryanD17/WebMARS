@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSimulator, type RecentFile, type ThemeName, type NumberBase } from '@/hooks/useSimulator.ts'
 import { runEditorAction } from '@/lib/editorActions.ts'
 import { REPO_URL, ISSUES_URL } from '@/lib/constants.ts'
+import { navigate } from '@/lib/router.ts'
 import { cn } from './cn.ts'
 
 // Each menu item is either a clickable action, a disabled placeholder
@@ -384,6 +385,20 @@ export function MenuBar() {
           </div>
         )
       })}
+
+      {/* Phase 4 SA-1: subtle "← Home" link back to the landing
+         page. Right-anchored so it doesn't crowd the menu items.
+         Users who deep-link to /app generally don't want to leave,
+         so this stays minimal. */}
+      <span className="flex-1" aria-hidden="true" />
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        title="Back to landing page"
+        className="rounded-sm px-2 py-1 text-[11px] text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+      >
+        ← Home
+      </button>
     </header>
   )
 }
