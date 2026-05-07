@@ -7,7 +7,7 @@ import { REPO_URL, ISSUES_URL } from '@/lib/constants.ts'
 // real secondary links underneath.
 
 const PRD_URL = `${REPO_URL}/blob/main/docs/PRD.md`
-const APP_URL = 'https://www.webmarsimulator.com/app'
+const APP_URL = 'https://www.webmarsimulator.com/'
 
 export function FinalCTA() {
   const [copied, setCopied] = useState(false)
@@ -60,7 +60,7 @@ export function FinalCTA() {
 
           <button
             type="button"
-            onClick={() => navigate('/app')}
+            onClick={() => navigate('/')}
             className="mt-2 w-full rounded-[10px] px-8 text-base font-semibold text-white transition-transform hover:-translate-y-0.5"
             style={{ background: 'var(--l-accent)', height: 56 }}
           >

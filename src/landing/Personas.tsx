@@ -24,7 +24,7 @@ const PERSONAS: ReadonlyArray<Persona> = [
       'Hover any instruction for the docs',
       'Breakpoints when you can’t find your bug',
     ],
-    cta: { label: 'Open the editor →', onClick: () => navigate('/app') },
+    cta: { label: 'Open the editor →', onClick: () => navigate('/') },
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" />

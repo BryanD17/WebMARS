@@ -50,7 +50,7 @@ export function Footer() {
             <li>
               <button
                 type="button"
-                onClick={() => navigate('/app')}
+                onClick={() => navigate('/')}
                 className="transition-colors hover:[color:white]"
                 style={{ color: '#A8B0C0' }}
               >

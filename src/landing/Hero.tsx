@@ -49,7 +49,7 @@ export function Hero() {
             <div className="flex flex-col">
               <button
                 type="button"
-                onClick={() => navigate('/app')}
+                onClick={() => navigate('/')}
                 className="group flex items-center justify-center gap-2 rounded-[10px] px-8 text-base font-semibold text-white transition-all hover:-translate-y-0.5"
                 style={{
                   background: 'var(--l-accent)',

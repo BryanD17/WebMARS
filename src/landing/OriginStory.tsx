@@ -98,7 +98,7 @@ export function OriginStory() {
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <button
               type="button"
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/')}
               className="rounded-[10px] px-8 py-3 text-base font-semibold text-white transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--l-accent)' }}
             >

@@ -8,7 +8,7 @@ The project is built in TypeScript with React, Vite, and Tailwind CSS, and runs 
 
 ## Live demo
 
-Visit **[webmarsimulator.com](https://www.webmarsimulator.com/)** for the project landing page, or jump straight to the IDE at **[webmarsimulator.com/app](https://www.webmarsimulator.com/app)**.
+The IDE is at **[webmarsimulator.com](https://www.webmarsimulator.com/)**. The about page (project background, team, features) is at **[webmarsimulator.com/about](https://www.webmarsimulator.com/about)**.
 
 ## Status
 
