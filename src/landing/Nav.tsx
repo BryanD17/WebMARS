@@ -77,7 +77,7 @@ export function Nav() {
           </a>
           <button
             type="button"
-            onClick={() => navigate('/app')}
+            onClick={() => navigate('/')}
             className="rounded-[10px] px-5 text-[15px] font-semibold text-white transition-transform hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--l-accent)]"
             style={{ background: 'var(--l-accent)', height: 40 }}
           >
@@ -132,7 +132,7 @@ export function Nav() {
             <li className="pt-2">
               <button
                 type="button"
-                onClick={() => { setMobileOpen(false); navigate('/app') }}
+                onClick={() => { setMobileOpen(false); navigate('/') }}
                 className="w-full rounded-[10px] px-5 py-3 text-base font-semibold text-white"
                 style={{ background: 'var(--l-accent)' }}
               >

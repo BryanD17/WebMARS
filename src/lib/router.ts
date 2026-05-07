@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react'
 
-// Phase 4 SA-1: minimal client-side router. The app has exactly two
-// routes (/ for the landing page, /app for the IDE) and adding
-// react-router-dom for that scope would be overkill. This 30-line
-// shim wraps window.history + popstate into a useRoute() hook.
+// Phase 4 routing. The IDE is the default route (/) so existing
+// users and direct deep-links land on the editor without an extra
+// hop. The marketing landing page lives at /about.
 //
-// navigate('/app') pushes a new history entry and dispatches a
-// synthetic popstate so any subscribed useRoute() instances rerender.
-// The browser's back/forward buttons fire popstate natively.
+// navigate('/about') pushes a new history entry and dispatches a
+// synthetic popstate so any subscribed useRoute() instances
+// rerender. The browser's back/forward buttons fire popstate
+// natively.
 
-export type Route = 'landing' | 'app'
+export type Route = 'app' | 'landing'
 
 export function getCurrentRoute(): Route {
-  if (typeof window === 'undefined') return 'landing'
-  return window.location.pathname.startsWith('/app') ? 'app' : 'landing'
+  if (typeof window === 'undefined') return 'app'
+  return window.location.pathname.startsWith('/about') ? 'landing' : 'app'
 }
 
-export function navigate(to: '/' | '/app'): void {
+export function navigate(to: '/' | '/about'): void {
   if (typeof window === 'undefined') return
   if (window.location.pathname === to) return
   window.history.pushState({}, '', to)

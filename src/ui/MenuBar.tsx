@@ -386,18 +386,18 @@ export function MenuBar() {
         )
       })}
 
-      {/* Phase 4 SA-1: subtle "← Home" link back to the landing
-         page. Right-anchored so it doesn't crowd the menu items.
-         Users who deep-link to /app generally don't want to leave,
-         so this stays minimal. */}
+      {/* Phase 4: subtle 'About' link to the marketing page at
+         /about. Right-anchored so it doesn't crowd the menu
+         items; the IDE itself is the default route (/) so this
+         stays minimal. */}
       <span className="flex-1" aria-hidden="true" />
       <button
         type="button"
-        onClick={() => navigate('/')}
-        title="Back to landing page"
+        onClick={() => navigate('/about')}
+        title="About this project"
         className="rounded-sm px-2 py-1 text-[11px] text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
       >
-        ← Home
+        About
       </button>
     </header>
   )
