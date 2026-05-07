@@ -84,7 +84,7 @@ export function Hero() {
 
           {/* Trust signals — real numbers only */}
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-[14px]" style={{ color: 'var(--l-ink-2)' }}>
-            <span>100+ tests passing</span>
+            <span>125+ tests passing</span>
             <span aria-hidden="true">·</span>
             <span>MIT licensed</span>
             <span aria-hidden="true">·</span>
