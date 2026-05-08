@@ -21,6 +21,12 @@ Built in TypeScript with React 19, Vite, Tailwind, Monaco, and Zustand.
 - PRD — [`docs/PRD.md`](./docs/PRD.md)
 - Final report — [`docs/FINAL_REPORT.md`](./docs/FINAL_REPORT.md)
 
+## Demo video
+
+A short walkthrough of the editor, debugger, and Tools menu:
+
+[![Watch the WebMARS demo on YouTube](https://img.youtube.com/vi/gSC3Dp6CAkQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=gSC3Dp6CAkQ)
+
 ---
 
 ## Getting started (Usage)
