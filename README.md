@@ -8,7 +8,7 @@ A modern, browser-based MIPS Assembler and Runtime Simulator.
 WebMARS is a complete MIPS development environment — assembler, simulator,
 debugger, and visual tools — running entirely in the browser. It is a
 re-implementation of the curriculum-standard
-[MARS](https://courses.missouristate.edu/KenVollmar/MARS/) simulator,
+[MARS](https://dpetersanderson.github.io/) simulator,
 rebuilt as a web app so students don't have to fight Java installs.
 Built in TypeScript with React 19, Vite, Tailwind, Monaco, and Zustand.
 
@@ -179,7 +179,7 @@ MIT. See [LICENSE](./LICENSE) for the full text.
 
 ## Acknowledgements
 
-Inspired by [MARS](https://courses.missouristate.edu/KenVollmar/MARS/)
+Inspired by [MARS](https://dpetersanderson.github.io/)
 by Pete Sanderson and Kenneth Vollmar at Missouri State University.
 WebMARS is an independent re-implementation, not a fork. Their work
 has supported MIPS education for over two decades and remains the
